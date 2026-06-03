@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.18.083
+ * Version: 1.18.084
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.18.083';
+    const VERSION = '1.18.084';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1483,7 +1483,7 @@ final class Program_Agenda_Plugin {
         }
 
         if ($type === 'speaker') {
-            echo '<div class="pa-page-settings-section pa-page-settings-image-section"><div class="pa-image-options-row">';
+            echo '<div class="pa-page-settings-section pa-page-settings-image-section"><h5>Speaker Page Image Settings</h5><div class="pa-image-options-row">';
             echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[image_shape]"><option value="" ' . selected($s['image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[image_border_width]" value="' . esc_attr($s['image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[image_border_color]', $s['image_border_color'] ?? '', '', 'Image border color', 'Speaker image border color');
@@ -2763,11 +2763,16 @@ final class Program_Agenda_Plugin {
         $directory_image_radius = $directory_image_shape === 'circle' ? '50%' : ($directory_image_shape === 'square' ? '0' : '');
         $directory_image_border_width = isset($speaker_page_settings['directory_image_border_width']) && $speaker_page_settings['directory_image_border_width'] !== '' ? absint($speaker_page_settings['directory_image_border_width']) : 0;
         $directory_image_border_color = !empty($speaker_page_settings['directory_image_border_color']) ? sanitize_hex_color($speaker_page_settings['directory_image_border_color']) : '';
-        $directory_image_style = 'box-sizing:border-box;';
-        if ($directory_image_radius !== '') { $directory_image_style .= 'border-radius:' . esc_attr($directory_image_radius) . ';'; }
+        $directory_image_frame_style = 'box-sizing:border-box;position:relative;overflow:hidden;line-height:0;';
+        $directory_image_inner_style = 'box-sizing:border-box;display:block;width:100%;height:100%;object-fit:cover;object-position:center center;border:0;margin:0;padding:0;';
+        $directory_image_overlay_style = 'display:none;';
+        if ($directory_image_radius !== '') {
+            $directory_image_frame_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;';
+            $directory_image_inner_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;';
+        }
         if ($directory_image_border_width > 0) {
-            $directory_image_style .= 'border-style:solid;border-width:' . $directory_image_border_width . 'px;';
-            $directory_image_style .= 'border-color:' . esc_attr($directory_image_border_color ?: 'currentColor') . ';';
+            $directory_image_overlay_style = 'display:block;position:absolute;inset:0;z-index:2;box-sizing:border-box;pointer-events:none;border-style:solid;border-width:' . $directory_image_border_width . 'px;border-color:' . esc_attr($directory_image_border_color ?: 'currentColor') . ';';
+            if ($directory_image_radius !== '') { $directory_image_overlay_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;'; }
         }
 
         ob_start();
@@ -2779,12 +2784,13 @@ final class Program_Agenda_Plugin {
             $company = get_post_meta($speaker->ID, '_pa_speaker_company', true);
             $permalink = get_permalink($speaker);
             echo '<article class="pa-program-speaker-card">';
-            echo '<a class="pa-program-speaker-image-link" href="' . esc_url($permalink) . '" aria-label="' . esc_attr($speaker->post_title) . '">';
+            echo '<a class="pa-program-speaker-image-link" style="' . esc_attr($directory_image_frame_style) . '" href="' . esc_url($permalink) . '" aria-label="' . esc_attr($speaker->post_title) . '">';
             if ($image_id) {
-                echo wp_get_attachment_image($image_id, 'medium', false, ['class'=>'pa-program-speaker-image', 'alt'=>esc_attr($speaker->post_title), 'style'=>$directory_image_style]);
+                echo wp_get_attachment_image($image_id, 'medium', false, ['class'=>'pa-program-speaker-image', 'alt'=>esc_attr($speaker->post_title), 'style'=>$directory_image_inner_style]);
             } else {
-                echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" style="' . esc_attr($directory_image_style) . '" aria-hidden="true"></span>';
+                echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" style="' . esc_attr($directory_image_inner_style) . '" aria-hidden="true"></span>';
             }
+            if ($directory_image_border_width > 0) { echo '<span class="pa-program-speaker-image-border" style="' . esc_attr($directory_image_overlay_style) . '" aria-hidden="true"></span>'; }
             echo '</a>';
             echo '<h3 class="pa-program-speaker-name"><a href="' . esc_url($permalink) . '">' . esc_html($speaker->post_title) . '</a></h3>';
             if ($role) { echo '<p class="pa-program-speaker-role">' . esc_html($role) . '</p>'; }
