@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.18.082
+ * Version: 1.18.083
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.18.082';
+    const VERSION = '1.18.083';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1488,6 +1488,12 @@ final class Program_Agenda_Plugin {
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[image_border_width]" value="' . esc_attr($s['image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[image_border_color]', $s['image_border_color'] ?? '', '', 'Image border color', 'Speaker image border color');
             echo '</div></div>';
+
+            echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-speaker-directory-image-settings"><h5>Speaker Directory Image Settings</h5><div class="pa-image-options-row">';
+            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[directory_image_shape]"><option value="" ' . selected($s['directory_image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['directory_image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['directory_image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
+            echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[directory_image_border_width]" value="' . esc_attr($s['directory_image_border_width'] ?? 0) . '" placeholder="0"></label>';
+            echo $this->color_control($root . '[directory_image_border_color]', $s['directory_image_border_color'] ?? '', '', 'Image border color', 'Speaker directory image border color');
+            echo '</div></div>';
         }
         echo '</section>';
     }
@@ -2385,9 +2391,11 @@ final class Program_Agenda_Plugin {
 
     private function sanitize_settings($raw) {
         $s = [];
-        foreach (['header_bg','content_bg','header_color','content_color','image_border_color'] as $k) { $s[$k] = sanitize_hex_color($raw[$k] ?? '') ?: ''; }
+        foreach (['header_bg','content_bg','header_color','content_color','image_border_color','directory_image_border_color'] as $k) { $s[$k] = sanitize_hex_color($raw[$k] ?? '') ?: ''; }
         $s['image_shape'] = in_array(($raw['image_shape'] ?? ''), ['','square','circle'], true) ? $raw['image_shape'] : '';
         $s['image_border_width'] = isset($raw['image_border_width']) && $raw['image_border_width'] !== '' ? absint($raw['image_border_width']) : 0;
+        $s['directory_image_shape'] = in_array(($raw['directory_image_shape'] ?? ''), ['','square','circle'], true) ? $raw['directory_image_shape'] : '';
+        $s['directory_image_border_width'] = isset($raw['directory_image_border_width']) && $raw['directory_image_border_width'] !== '' ? absint($raw['directory_image_border_width']) : 0;
         foreach (['header_border','content_border'] as $key) {
             $v = (array)($raw[$key] ?? []);
             $lock_radius = !empty($v['lock_radius']) ? 1 : 0;
@@ -2749,6 +2757,19 @@ final class Program_Agenda_Plugin {
             return strcasecmp($a->post_title, $b->post_title);
         });
 
+        $speaker_page_settings = $this->speaker_page_settings_for_program($program_id);
+        if (!is_array($speaker_page_settings)) { $speaker_page_settings = []; }
+        $directory_image_shape = $speaker_page_settings['directory_image_shape'] ?? '';
+        $directory_image_radius = $directory_image_shape === 'circle' ? '50%' : ($directory_image_shape === 'square' ? '0' : '');
+        $directory_image_border_width = isset($speaker_page_settings['directory_image_border_width']) && $speaker_page_settings['directory_image_border_width'] !== '' ? absint($speaker_page_settings['directory_image_border_width']) : 0;
+        $directory_image_border_color = !empty($speaker_page_settings['directory_image_border_color']) ? sanitize_hex_color($speaker_page_settings['directory_image_border_color']) : '';
+        $directory_image_style = 'box-sizing:border-box;';
+        if ($directory_image_radius !== '') { $directory_image_style .= 'border-radius:' . esc_attr($directory_image_radius) . ';'; }
+        if ($directory_image_border_width > 0) {
+            $directory_image_style .= 'border-style:solid;border-width:' . $directory_image_border_width . 'px;';
+            $directory_image_style .= 'border-color:' . esc_attr($directory_image_border_color ?: 'currentColor') . ';';
+        }
+
         ob_start();
         echo '<section class="pa-program-speakers" aria-label="Program speakers">';
         echo '<div class="pa-program-speaker-grid">';
@@ -2760,9 +2781,9 @@ final class Program_Agenda_Plugin {
             echo '<article class="pa-program-speaker-card">';
             echo '<a class="pa-program-speaker-image-link" href="' . esc_url($permalink) . '" aria-label="' . esc_attr($speaker->post_title) . '">';
             if ($image_id) {
-                echo wp_get_attachment_image($image_id, 'medium', false, ['class'=>'pa-program-speaker-image', 'alt'=>esc_attr($speaker->post_title)]);
+                echo wp_get_attachment_image($image_id, 'medium', false, ['class'=>'pa-program-speaker-image', 'alt'=>esc_attr($speaker->post_title), 'style'=>$directory_image_style]);
             } else {
-                echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" aria-hidden="true"></span>';
+                echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" style="' . esc_attr($directory_image_style) . '" aria-hidden="true"></span>';
             }
             echo '</a>';
             echo '<h3 class="pa-program-speaker-name"><a href="' . esc_url($permalink) . '">' . esc_html($speaker->post_title) . '</a></h3>';
