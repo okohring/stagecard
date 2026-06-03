@@ -2687,8 +2687,8 @@ body.pa-program-entity-page .byline{
 .pa-sponsor-showcase-separator{display:none!important;margin:0!important;border:0!important;}
 .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(3,250px)!important;
-  gap:40px 38px!important;
+  grid-template-columns:repeat(4,250px)!important;
+  gap:40px 50px!important;
   justify-content:start!important;
   align-items:center!important;
   max-width:826px!important;
