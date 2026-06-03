@@ -280,7 +280,10 @@
 }
 .pa-agenda-speakers-inline .pa-speaker-card-list-agenda::-webkit-scrollbar-thumb{
   background:var(--pa-agenda-scroll-color, currentColor);
-  border-radius:var(--pa-agenda-tab-border-radius, 999px);
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px);
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px);
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px);
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px);
 }
 .pa-agenda-speakers-inline .pa-speaker-card-list-agenda::-webkit-scrollbar-corner{
   background:transparent;
@@ -297,7 +300,12 @@
 }
 .pa-agenda-day-tab{
   appearance:none;
-  border:var(--pa-agenda-tab-border-width, 1px) solid var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent));
+  border-style:solid;
+  border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent));
+  border-top-width:var(--pa-agenda-tab-border-width-top, 1px);
+  border-right-width:var(--pa-agenda-tab-border-width-right, 1px);
+  border-bottom-width:var(--pa-agenda-tab-border-width-bottom, 1px);
+  border-left-width:var(--pa-agenda-tab-border-width-left, 1px);
   background:var(--pa-agenda-tab-bg, transparent);
   color:var(--pa-agenda-tab-color, inherit);
   padding:.7rem 1.1rem;
@@ -313,7 +321,10 @@
   min-width:4rem;
 }
 .pa-agenda-tabs-square .pa-agenda-day-tab{
-  border-radius:var(--pa-agenda-tab-border-radius, 0);
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px);
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px);
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px);
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px);
 }
 .pa-agenda-day-tab.active,
 .pa-agenda-day-tab:hover,
@@ -755,7 +766,17 @@
   }
 }
 
-.pa-agenda-day-tab{border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;}
+.pa-agenda-day-tab{
+  border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;
+  border-top-width:var(--pa-agenda-tab-border-width-top, 1px)!important;
+  border-right-width:var(--pa-agenda-tab-border-width-right, 1px)!important;
+  border-bottom-width:var(--pa-agenda-tab-border-width-bottom, 1px)!important;
+  border-left-width:var(--pa-agenda-tab-border-width-left, 1px)!important;
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px)!important;
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px)!important;
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px)!important;
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px)!important;
+}
 
 /* v79 cleanup: event card borders, filters, and removed width feature */
 .pa-schedule{

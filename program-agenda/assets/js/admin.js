@@ -554,12 +554,24 @@ jQuery(function($){
     var mode=$('[name="agenda[display_mode]"]').val();
     $tabs.prop('hidden', mode !== 'tabs');
     if(mode === 'tabs'){
-      var tabCss={};
       var effectiveTabBg = tabBg || bg;
-      if(effectiveTabBg) tabCss.backgroundColor=effectiveTabBg;
-      if(titleCol) tabCss.color=titleCol;
-      if(tabBorder) tabCss.borderColor=tabBorder;
-      $tabs.find('button').attr('style','').css(tabCss).toggleClass('is-square', $('[name="agenda[tab_shape]"]').val() === 'square');
+      var $tabButtons = $tabs.find('.pa-agenda-day-tab, button');
+      $tabs.attr('style','');
+      if(effectiveTabBg) $tabs[0].style.setProperty('--pa-agenda-tab-bg', effectiveTabBg);
+      if(titleCol) $tabs[0].style.setProperty('--pa-agenda-tab-color', titleCol);
+      if(tabBorder) $tabs[0].style.setProperty('--pa-agenda-tab-border-color', tabBorder);
+
+      ['top','right','bottom','left'].forEach(function(side){
+        var v=$('[name="agenda[tab_border][width_'+side+']"]').val();
+        if(v !== undefined && v !== ''){ $tabs[0].style.setProperty('--pa-agenda-tab-border-width-'+side, parseInt(v,10)+'px'); }
+      });
+      var radiusMap={tl:'tl',tr:'tr',br:'br',bl:'bl'};
+      Object.keys(radiusMap).forEach(function(k){
+        var v=$('[name="agenda[tab_border][radius_'+k+']"]').val();
+        if(v !== undefined && v !== ''){ $tabs[0].style.setProperty('--pa-agenda-tab-radius-'+radiusMap[k], parseInt(v,10)+'px'); }
+      });
+
+      $tabButtons.removeClass('is-square').attr('style','');
     }
     var display=$('[name="agenda[date_display]"]').val();
     var sample=display==='abbrev'||display==='full'?'Aug. 20':'8/20';
@@ -606,8 +618,13 @@ jQuery(function($){
     $('[name="agenda[show_filters]"]').prop('checked', true);
     $('[name="agenda[show_descriptions]"]').val('hide');
     $('[name="agenda[display_mode]"]').val('tabs');
-    $('[name="agenda[tab_shape]"]').val('rounded');
     $('[name="agenda[speaker_layout]"]').val('inline');
+    setColor($('[name="agenda[tab_background_color]"]').closest('.pa-color-control'),'');
+    setColor($('[name="agenda[tab_border_color]"]').closest('.pa-color-control'),'');
+    $('[name="agenda[tab_border][lock_radius]"]').prop('checked', true);
+    $('[name="agenda[tab_border][lock_width]"]').prop('checked', true);
+    ['tl','tr','br','bl'].forEach(function(k){ $('[name="agenda[tab_border][radius_'+k+']"]').val('999'); });
+    ['top','right','bottom','left'].forEach(function(k){ $('[name="agenda[tab_border][width_'+k+']"]').val('1'); });
     $('[name="agenda[date_display]"]').val('numeric');
     $('[name="agenda[card_size]"]').val('full');
     setColor($('[name="agenda[background]"]').closest('.pa-color-control'),'');

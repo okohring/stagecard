@@ -22180,3 +22180,43 @@
 .pa-program-page-preview-card .pa-single-content .pa-preview-line-content{width:min(360px,100%);}
 .pa-preview-header .pa-preview-line,
 .pa-preview-content .pa-preview-line{background:currentColor;}
+
+
+/* v1.19.002: agenda tab preview mirrors public tab controls */
+.pa-agenda-tabs-preview.pa-agenda-day-tabs{
+  margin:0 0 14px;
+}
+.pa-agenda-tabs-preview .pa-agenda-day-tab-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:0;
+}
+.pa-agenda-tabs-preview .pa-agenda-day-tab{
+  appearance:none;
+  border-style:solid;
+  border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent));
+  border-top-width:var(--pa-agenda-tab-border-width-top, 1px);
+  border-right-width:var(--pa-agenda-tab-border-width-right, 1px);
+  border-bottom-width:var(--pa-agenda-tab-border-width-bottom, 1px);
+  border-left-width:var(--pa-agenda-tab-border-width-left, 1px);
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px);
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px);
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px);
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px);
+  background:var(--pa-agenda-tab-bg, transparent);
+  color:var(--pa-agenda-tab-color, inherit);
+  padding:.7rem 1.1rem;
+  font-family:Montserrat, Arial, Helvetica, sans-serif;
+  font-size:1rem;
+  line-height:1.1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:4rem;
+  cursor:default;
+}
+.pa-agenda-tabs-preview .pa-agenda-day-tab.active{
+  filter:brightness(.94);
+  box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset;
+}

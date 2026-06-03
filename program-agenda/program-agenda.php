@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.19.000
+ * Version: 1.19.002
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.19.000';
+    const VERSION = '1.19.002';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1326,6 +1326,31 @@ final class Program_Agenda_Plugin {
         echo '</div></details>';
     }
 
+    private function sanitize_tab_border_options($input) {
+        $input = is_array($input) ? $input : [];
+        $out = [
+            'lock_radius' => !empty($input['lock_radius']) ? '1' : '',
+            'lock_width' => !empty($input['lock_width']) ? '1' : '',
+        ];
+        foreach (['tl','tr','br','bl'] as $corner) {
+            $key = 'radius_' . $corner;
+            $out[$key] = isset($input[$key]) && $input[$key] !== '' ? absint($input[$key]) : 999;
+        }
+        foreach (['top','right','bottom','left'] as $side) {
+            $key = 'width_' . $side;
+            $out[$key] = isset($input[$key]) && $input[$key] !== '' ? absint($input[$key]) : 1;
+        }
+        if (!empty($out['lock_radius'])) {
+            $shared_radius = $out['radius_tl'];
+            foreach (['tr','br','bl'] as $corner) { $out['radius_' . $corner] = $shared_radius; }
+        }
+        if (!empty($out['lock_width'])) {
+            $shared_width = $out['width_top'];
+            foreach (['right','bottom','left'] as $side) { $out['width_' . $side] = $shared_width; }
+        }
+        return $out;
+    }
+
     private function sanitize_program_border_options($raw) {
         $raw = (array)$raw;
         $out = [
@@ -1400,10 +1425,18 @@ final class Program_Agenda_Plugin {
         echo $this->color_control('agenda[tab_background_color]', $s['tab_background_color'] ?? '', '', 'Tab color', 'Agenda tab color');
         echo $this->color_control('agenda[tab_border_color]', $s['tab_border_color'] ?? '', '', 'Tab border color', 'Agenda tab border color');
         echo '</div>';
-        echo '<div class="pa-agenda-options-row pa-agenda-tab-border-controls">';
-        echo '<label class="pa-field">Tab border width<input class="pa-agenda-live-field" type="number" min="0" name="agenda[tab_border_width]" value="' . esc_attr($s['tab_border_width'] ?? 1) . '" placeholder="1"></label>';
-        echo '<label class="pa-field">Tab border radius<input class="pa-agenda-live-field" type="number" min="0" name="agenda[tab_border_radius]" value="' . esc_attr($s['tab_border_radius'] ?? 999) . '" placeholder="999"></label>';
-        echo '</div>';
+        $tab_border = isset($s['tab_border']) && is_array($s['tab_border']) ? $s['tab_border'] : [];
+        echo '<details class="pa-control-group pa-border-control pa-collapsible-border pa-tab-border-control" open>';
+        echo '<summary>Tab border <small>Radius, width, and color</small></summary>';
+        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Corner radius</strong><label><input class="pa-lock-radius" type="checkbox" name="agenda[tab_border][lock_radius]" value="1" ' . checked(!empty($tab_border['lock_radius']), true, false) . '> Same for every corner</label></div>';
+        echo '<div class="pa-border-grid pa-radius-fields">';
+        foreach (['tl'=>'Top left','tr'=>'Top right','br'=>'Bottom right','bl'=>'Bottom left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-radius-input pa-agenda-live-field" type="number" min="0" name="agenda[tab_border][radius_' . esc_attr($k) . ']" value="' . esc_attr($tab_border['radius_'.$k] ?? 999) . '" placeholder="999"></label>'; }
+        echo '</div></div>';
+        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Border width</strong><label><input class="pa-lock-width" type="checkbox" name="agenda[tab_border][lock_width]" value="1" ' . checked(!empty($tab_border['lock_width']), true, false) . '> Same for every side</label></div>';
+        echo '<div class="pa-border-grid pa-width-fields">';
+        foreach (['top'=>'Top','right'=>'Right','bottom'=>'Bottom','left'=>'Left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-width-input pa-agenda-live-field" type="number" min="0" name="agenda[tab_border][width_' . esc_attr($k) . ']" value="' . esc_attr($tab_border['width_'.$k] ?? 1) . '" placeholder="1"></label>'; }
+        echo '</div></div>';
+        echo '</details>';
         echo '<label class="pa-field">Date display <select class="pa-agenda-live-field" name="agenda[date_display]"><option value="numeric" ' . selected($date_display, 'numeric', false) . '>8/20</option><option value="abbrev" ' . selected($date_display, 'abbrev', false) . '>Aug. 20</option></select></label>';
         echo '<label class="pa-field">Card size <select class="pa-agenda-live-field" name="agenda[card_size]"><option value="full" ' . selected($card_size, 'full', false) . '>Full: compact speaker cards</option><option value="thin" ' . selected($card_size, 'thin', false) . '>Thin: title/meta only</option></select></label>';
         echo '</div></details>';
@@ -1439,7 +1472,7 @@ final class Program_Agenda_Plugin {
 
     private function combined_program_preview($agenda, $speaker_card) {
         echo '<section class="pa-combined-preview-section"><h3>Preview</h3>';
-        echo '<div class="pa-agenda-tabs-preview" hidden><button type="button" class="active">8/20</button><button type="button">8/21</button></div>';
+        echo '<div class="pa-agenda-tabs-preview pa-agenda-day-tabs" hidden><div class="pa-agenda-day-tab-list"><button type="button" class="pa-agenda-day-tab active">8/20</button><button type="button" class="pa-agenda-day-tab">8/21</button></div></div>';
         echo '<article class="pa-event-card pa-event-card-preview pa-event-card--has-speakers pa-event-card--speakers-inline pa-event-card--size-full">';
         echo '<div class="pa-event-card__datebar"><span class="pa-event-card__date pa-event-card-preview-date">8/20</span><span class="pa-event-card__time">00:00</span></div>';
         echo '<div class="pa-event-card__body"><div class="pa-event-card__summary"><h4 class="pa-event-card__title"><span class="pa-preview-line pa-preview-line-title"></span></h4><p class="pa-event-card__meta"><span class="pa-event-card__category"><span class="pa-event-card__category-icon">★</span><span class="pa-preview-line pa-preview-line-short"></span></span><span class="pa-event-card__meta-dot" aria-hidden="true">•</span><span class="pa-preview-line pa-preview-line-medium"></span></p><div class="pa-event-card__description pa-event-card-preview-description"><span class="pa-preview-line pa-preview-line-content"></span><span class="pa-preview-line pa-preview-line-content"></span></div></div>';
@@ -1750,8 +1783,7 @@ final class Program_Agenda_Plugin {
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
             'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
             'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
-            'tab_border_width' => isset($agenda_in['tab_border_width']) && $agenda_in['tab_border_width'] !== '' ? absint($agenda_in['tab_border_width']) : 1,
-            'tab_border_radius' => isset($agenda_in['tab_border_radius']) && $agenda_in['tab_border_radius'] !== '' ? absint($agenda_in['tab_border_radius']) : 999,
+            'tab_border' => $this->sanitize_tab_border_options($agenda_in['tab_border'] ?? []),
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -1823,8 +1855,7 @@ final class Program_Agenda_Plugin {
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
             'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
             'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
-            'tab_border_width' => isset($agenda_in['tab_border_width']) && $agenda_in['tab_border_width'] !== '' ? absint($agenda_in['tab_border_width']) : 1,
-            'tab_border_radius' => isset($agenda_in['tab_border_radius']) && $agenda_in['tab_border_radius'] !== '' ? absint($agenda_in['tab_border_radius']) : 999,
+            'tab_border' => $this->sanitize_tab_border_options($agenda_in['tab_border'] ?? []),
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -2658,8 +2689,15 @@ final class Program_Agenda_Plugin {
         $tab_bg_color = $agenda['tab_background_color'] ?? ($agenda['background'] ?? '');
         if (!empty($tab_bg_color)) { $tab_style .= '--pa-agenda-tab-bg:' . esc_attr($tab_bg_color) . ';'; }
         if (!empty($agenda['tab_border_color'])) { $tab_style .= '--pa-agenda-tab-border-color:' . esc_attr($agenda['tab_border_color']) . ';'; }
-        if (isset($agenda['tab_border_width']) && $agenda['tab_border_width'] !== '') { $tab_style .= '--pa-agenda-tab-border-width:' . absint($agenda['tab_border_width']) . 'px;'; }
-        if (isset($agenda['tab_border_radius']) && $agenda['tab_border_radius'] !== '') { $tab_style .= '--pa-agenda-tab-border-radius:' . absint($agenda['tab_border_radius']) . 'px;'; }
+        $tab_border = isset($agenda['tab_border']) && is_array($agenda['tab_border']) ? $agenda['tab_border'] : [];
+        $tab_style .= '--pa-agenda-tab-border-width-top:' . absint($tab_border['width_top'] ?? 1) . 'px;';
+        $tab_style .= '--pa-agenda-tab-border-width-right:' . absint($tab_border['width_right'] ?? 1) . 'px;';
+        $tab_style .= '--pa-agenda-tab-border-width-bottom:' . absint($tab_border['width_bottom'] ?? 1) . 'px;';
+        $tab_style .= '--pa-agenda-tab-border-width-left:' . absint($tab_border['width_left'] ?? 1) . 'px;';
+        $tab_style .= '--pa-agenda-tab-radius-tl:' . absint($tab_border['radius_tl'] ?? 999) . 'px;';
+        $tab_style .= '--pa-agenda-tab-radius-tr:' . absint($tab_border['radius_tr'] ?? 999) . 'px;';
+        $tab_style .= '--pa-agenda-tab-radius-br:' . absint($tab_border['radius_br'] ?? 999) . 'px;';
+        $tab_style .= '--pa-agenda-tab-radius-bl:' . absint($tab_border['radius_bl'] ?? 999) . 'px;';
         $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
         if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
         echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';
