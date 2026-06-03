@@ -3470,7 +3470,7 @@ body.pa-program-entity-page .byline{
 }
 .pa-single-event-speaker-sections .pa-single-event-speaker-section .pa-speaker-card-list{
   display:grid!important;
-  grid-template-columns:repeat(4,minmax(0,250px))!important;
+  grid-template-columns:repeat(4,minmax(0,230px))!important;
   gap:12px!important;
   align-items:start!important;
   justify-items:start!important;
@@ -3514,8 +3514,8 @@ body.pa-program-entity-page .byline{
 }
 .pa-program-speaker-grid{
   display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:44px 16px!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:44px 44px!important;
   align-items:start!important;
   justify-items:center!important;
 }
