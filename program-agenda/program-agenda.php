@@ -3070,9 +3070,9 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
 
 echo '<section class="pa-sponsor-level-group' . ($is_primary_sponsor_level ? ' pa-sponsor-level-group--primary' : '') . '">';
 if ($is_primary_sponsor_level) {
-    echo '<h3>' . esc_html($level) . '</h3>';
+    echo '<h2>' . esc_html($level) . '</h2>';
 } else {
-    echo '<h4>' . esc_html($level) . '</h4>';
+    echo '<h3>' . esc_html($level) . '</h3>';
 }
 echo '<div class="pa-sponsor-logo-grid">';
             foreach ($level_sponsors as $sponsor) { echo $this->sponsor_showcase_logo($sponsor); }

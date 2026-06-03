@@ -2762,11 +2762,10 @@ body.pa-program-entity-page .byline{
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
   width:350px!important;
   height:200px!important;
-  max-width:100%!important;
   object-fit:contain!important;
 }
 
-@media(max-width:760px){
+@media(max-width:796px){
   .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
     grid-template-columns:1fr!important;
   }
