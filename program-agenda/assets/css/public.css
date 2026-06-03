@@ -2729,35 +2729,32 @@ body.pa-program-entity-page .byline{
 @media(max-width:900px){.pa-sponsor-logo-grid{grid-template-columns:repeat(2,250px)!important;max-width:538px!important;}}
 @media(max-width:640px){.pa-sponsor-logo-grid{grid-template-columns:repeat(auto-fit,minmax(150px,250px))!important;justify-content:center!important;max-width:none!important;}.pa-sponsor-showcase-logo,.pa-sponsor-showcase-name{width:min(250px,100%)!important;}.pa-sponsor-showcase-logo-img{max-width:100%!important;}}
 
-/*Adding Primary Level to Sponsor Showcase */
-.pa-sponsor-level-group > h2,
-.pa-sponsor-level-group > h3{
+
+/* New sizing for Sponsor Showcase */
+
+/* Sponsor showcase headers */
+.pa-sponsor-level-group > h3,
+.pa-sponsor-level-group > h4{
   text-align:center!important;
 }
 
-.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) > h3{
-  margin:0 0 18px!important;
-}
-
-.pa-sponsor-level-group--primary > h2{
-  margin:0 0 28px!important;
-}
-
+/* Primary sponsor level: large, 2 across */
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, 500px)!important;
+  grid-template-columns:repeat(2, 420px)!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
   gap:48px 72px!important;
   width:100%!important;
-  max-width:820px!important;
+  max-width:960px!important;
   margin:0 auto!important;
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
-  width:500px!important;
-  height:300px!important;
+  width:420px!important;
+  height:240px!important;
+  max-width:420px!important;
   margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
@@ -2765,52 +2762,73 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-  width:500px!important;
-  height:300px!important;
+  width:420px!important;
+  height:240px!important;
+  max-width:420px!important;
+  max-height:240px!important;
   object-fit:contain!important;
   display:block!important;
   margin:0 auto!important;
 }
 
-@media(max-width:796px){
-  .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
-    grid-template-columns:1fr!important;
-  }
-
-  .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo,
-  .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-    width:100%!important;
-    max-width:500px!important;
-    height:300px!important;
-  }
-}
-
-/* Non-primary sponsor level logo grids */
+/* Non-primary sponsor levels: centered, smaller */
 .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-logo-grid{
   display:grid!important;
   grid-template-columns:repeat(auto-fit, minmax(180px, 220px))!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
-  gap:32px 50px!important;
+  gap:32px 48px!important;
   width:100%!important;
   max-width:900px!important;
   margin:0 auto!important;
 }
 
-/* Non-primary sponsor logo wrappers */
 .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo{
+  width:220px!important;
+  height:120px!important;
+  max-width:220px!important;
   margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;
 }
 
-/* Non-primary sponsor logo images */
 .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo-img{
+  width:220px!important;
+  height:120px!important;
+  max-width:220px!important;
+  max-height:120px!important;
+  object-fit:contain!important;
   display:block!important;
   margin:0 auto!important;
-  object-fit:contain!important;
+}
+
+/* Mobile sponsor showcase */
+@media(max-width:760px){
+  .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
+    grid-template-columns:1fr!important;
+    max-width:100%!important;
+  }
+
+  .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo,
+  .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
+    width:100%!important;
+    max-width:420px!important;
+    height:240px!important;
+  }
+
+  .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-logo-grid{
+    grid-template-columns:1fr!important;
+    max-width:100%!important;
+  }
+
+  .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo,
+  .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo-img{
+    width:100%!important;
+    max-width:220px!important;
+    height:120px!important;
+  }
 }
 
 .pa-single-sponsor{width:min(100%,1120px);max-width:1120px;margin-left:auto;margin-right:auto;box-sizing:border-box;}
