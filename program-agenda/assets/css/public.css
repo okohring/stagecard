@@ -2730,16 +2730,16 @@ body.pa-program-entity-page .byline{
 @media(max-width:640px){.pa-sponsor-logo-grid{grid-template-columns:repeat(auto-fit,minmax(150px,250px))!important;justify-content:center!important;max-width:none!important;}.pa-sponsor-showcase-logo,.pa-sponsor-showcase-name{width:min(250px,100%)!important;}.pa-sponsor-showcase-logo-img{max-width:100%!important;}}
 
 /*Adding Primary Level to Sponsor Showcase */
-.pa-sponsor-level-group > h3,
-.pa-sponsor-level-group > h4{
+.pa-sponsor-level-group > h2,
+.pa-sponsor-level-group > h3{
   text-align:center!important;
 }
 
-.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) > h4{
+.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) > h3{
   margin:0 0 18px!important;
 }
 
-.pa-sponsor-level-group--primary > h3{
+.pa-sponsor-level-group--primary > h2{
   margin:0 0 28px!important;
 }
 
@@ -2754,12 +2754,11 @@ body.pa-program-entity-page .byline{
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
   width:350px!important;
   height:200px!important;
-  max-width:100%!important;
+  margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;
 }
-
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
   width:350px!important;
   height:200px!important;
