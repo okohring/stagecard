@@ -1987,6 +1987,8 @@ body.pa-program-entity-page .byline{
   padding:14px 12px!important;
   text-align:center!important;
   overflow:hidden!important;
+  margin:-1px 0 -1px -1px!important;
+  align-self:stretch!important;
 }
 .pa-event-card__date,
 .pa-event-card__time{
