@@ -1177,11 +1177,24 @@ final class Program_Agenda_Plugin {
         echo '</div><button type="button" class="button pa-add-speaker-category">Add speaker category</button>';
         echo '<template id="pa-speaker-category-template">'; $this->speaker_category_row('__INDEX__', ['name'=>'']); echo '</template></div></section>';
         $sponsor_levels = $id ? get_post_meta($id, '_pa_sponsor_levels', true) : [];
+        $primary_sponsor_level = $id ? get_post_meta($id, '_pa_primary_sponsor_level', true) : '';
         if (!is_array($sponsor_levels)) { $sponsor_levels = []; }
         echo '<section class="pa-sponsor-levels-section"><h3>Sponsor Levels</h3><p class="description">Add sponsor levels for this Program. Sponsors can be assigned to one or more levels. Drag, or use the arrows, to reorder how levels appear on sponsor showcase pages.</p><div id="pa-sponsor-levels">';
         if (!$sponsor_levels) { $sponsor_levels = ['']; }
         foreach ($sponsor_levels as $i => $level) { $this->sponsor_level_row($i, $level); }
         echo '</div><button type="button" class="button pa-add-sponsor-level">Add sponsor level</button><template id="pa-sponsor-level-template">'; $this->sponsor_level_row('__INDEX__', ''); echo '</template></section>';
+        echo '<label class="pa-field pa-primary-sponsor-level-field">Primary Sponsor Level';
+echo '<select name="primary_sponsor_level">';
+echo '<option value="">None</option>';
+
+foreach ($sponsor_levels as $level) {
+    if ($level === '') { continue; }
+    echo '<option value="' . esc_attr($level) . '" ' . selected($primary_sponsor_level, $level, false) . '>' . esc_html($level) . '</option>';
+}
+
+echo '</select>';
+echo '<small>The selected sponsor level will display larger, two logos across.</small>';
+echo '</label>';
         echo '<details class="pa-program-advanced-settings"><summary><span>Advanced Settings</span><small>Adjust how the public agenda, speaker cards, and individual Event/Speaker pages appear for this program.</small><small>Leave fields blank to inherit the active WordPress theme. Border width and radius default to 0.</small></summary><div class="pa-program-advanced-inner">';
         $this->program_advanced_settings_module($agenda, $speaker_card, $event_page_settings, $speaker_page_settings);
         echo '</div></details>';
@@ -1887,6 +1900,13 @@ final class Program_Agenda_Plugin {
             if ($level !== '' && !in_array($level, $sponsor_levels, true)) { $sponsor_levels[] = $level; }
         }
         update_post_meta($new_id, '_pa_sponsor_levels', $sponsor_levels);
+        $primary_sponsor_level = sanitize_text_field($_POST['primary_sponsor_level'] ?? '');
+
+if ($primary_sponsor_level !== '' && !in_array($primary_sponsor_level, $sponsor_levels, true)) {
+    $primary_sponsor_level = '';
+}
+
+update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         $card_in = (array)($_POST['speaker_card'] ?? []);
         $card = [
             'show_thumbnail' => !empty($card_in['show_thumbnail']) ? '1' : '0',
@@ -3039,12 +3059,18 @@ final class Program_Agenda_Plugin {
         }
         if ($unleveled) { $grouped['Sponsors'] = $unleveled; }
 
+        $primary_sponsor_level = get_post_meta($program_id, '_pa_primary_sponsor_level', true);
+
         ob_start();
         echo '<section class="pa-sponsor-showcase" aria-label="Sponsors">';
         $printed = 0;
         foreach ($grouped as $level => $level_sponsors) {
             if (!$level_sponsors) { continue; }
-            echo '<section class="pa-sponsor-level-group"><h3>' . esc_html($level) . '</h3><div class="pa-sponsor-logo-grid">';
+            $is_primary_sponsor_level = ($primary_sponsor_level !== '' && $level === $primary_sponsor_level);
+
+echo '<section class="pa-sponsor-level-group' . ($is_primary_sponsor_level ? ' pa-sponsor-level-group--primary' : '') . '">';
+echo '<h3>' . esc_html($level) . '</h3>';
+echo '<div class="pa-sponsor-logo-grid">';
             foreach ($level_sponsors as $sponsor) { echo $this->sponsor_showcase_logo($sponsor); }
             echo '</div></section>';
             $printed++;
