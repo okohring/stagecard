@@ -2741,7 +2741,7 @@ body.pa-program-entity-page .byline{
 /* Primary sponsor level: large, 2 across */
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, 420px)!important;
+  grid-template-columns:repeat(2, 380px)!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
@@ -2752,9 +2752,9 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
-  width:420px!important;
-  height:240px!important;
-  max-width:420px!important;
+  width:380px!important;
+  height:215px!important;
+  max-width:380px!important;
   margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
@@ -2762,10 +2762,10 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-  width:420px!important;
-  height:240px!important;
-  max-width:420px!important;
-  max-height:240px!important;
+  width:380px!important;
+  height:215px!important;
+  max-width:380px!important;
+  max-height:215px!important;
   object-fit:contain!important;
   display:block!important;
   margin:0 auto!important;
@@ -2814,8 +2814,8 @@ body.pa-program-entity-page .byline{
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo,
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
     width:100%!important;
-    max-width:420px!important;
-    height:240px!important;
+    max-width:380px!important;
+    height:215px!important;
   }
 
   .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-logo-grid{
