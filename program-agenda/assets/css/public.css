@@ -2741,7 +2741,7 @@ body.pa-program-entity-page .byline{
 /* Primary sponsor level: large, 2 across */
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, 380px)!important;
+  grid-template-columns:repeat(2, 300px)!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
@@ -2752,9 +2752,9 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
-  width:380px!important;
-  height:215px!important;
-  max-width:380px!important;
+  width:300px!important;
+  height:180px!important;
+  max-width:300px!important;
   margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
@@ -2762,10 +2762,10 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-  width:380px!important;
-  height:215px!important;
-  max-width:380px!important;
-  max-height:215px!important;
+  width:300px!important;
+  height:180px!important;
+  max-width:300px!important;
+  max-height:180px!important;
   object-fit:contain!important;
   display:block!important;
   margin:0 auto!important;
@@ -2814,8 +2814,8 @@ body.pa-program-entity-page .byline{
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo,
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
     width:100%!important;
-    max-width:380px!important;
-    height:215px!important;
+    max-width:300px!important;
+    height:180px!important;
   }
 
   .pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-logo-grid{
@@ -2829,6 +2829,26 @@ body.pa-program-entity-page .byline{
     max-width:220px!important;
     height:120px!important;
   }
+}
+
+/* Center all sponsor level headings */
+.pa-sponsor-level-group{
+  text-align:center!important;
+}
+
+.pa-sponsor-level-group > h3,
+.pa-sponsor-level-group > h4{
+  display:block!important;
+  width:100%!important;
+  text-align:center!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+
+/* Primary sponsor header */
+.pa-sponsor-level-group--primary > h3{
+  text-align:center!important;
+  margin:0 auto 28px!important;
 }
 
 .pa-single-sponsor{width:min(100%,1120px);max-width:1120px;margin-left:auto;margin-right:auto;box-sizing:border-box;}
