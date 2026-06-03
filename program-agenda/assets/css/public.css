@@ -2745,7 +2745,7 @@ body.pa-program-entity-page .byline{
 
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, 350px)!important;
+  grid-template-columns:repeat(2, 450px)!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
@@ -2756,8 +2756,8 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
-  width:350px!important;
-  height:200px!important;
+  width:450px!important;
+  height:300px!important;
   margin:0 auto!important;
   display:flex!important;
   align-items:center!important;
@@ -2765,8 +2765,8 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-  width:350px!important;
-  height:200px!important;
+  width:450px!important;
+  height:300px!important;
   object-fit:contain!important;
   display:block!important;
   margin:0 auto!important;
@@ -2783,6 +2783,34 @@ body.pa-program-entity-page .byline{
     max-width:350px!important;
     height:200px!important;
   }
+}
+
+/* Non-primary sponsor level logo grids */
+.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-logo-grid{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit, minmax(180px, 220px))!important;
+  justify-content:center!important;
+  justify-items:center!important;
+  align-items:center!important;
+  gap:32px 48px!important;
+  width:100%!important;
+  max-width:900px!important;
+  margin:0 auto!important;
+}
+
+/* Non-primary sponsor logo wrappers */
+.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo{
+  margin:0 auto!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+/* Non-primary sponsor logo images */
+.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) .pa-sponsor-showcase-logo-img{
+  display:block!important;
+  margin:0 auto!important;
+  object-fit:contain!important;
 }
 
 .pa-single-sponsor{width:min(100%,1120px);max-width:1120px;margin-left:auto;margin-right:auto;box-sizing:border-box;}
