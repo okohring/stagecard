@@ -309,7 +309,10 @@
   background:var(--pa-agenda-tab-bg, transparent);
   color:var(--pa-agenda-tab-color, inherit);
   padding:.7rem 1.1rem;
-  border-radius:999px;
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px);
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px);
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px);
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px);
   cursor:pointer;
   font-family: Montserrat, Arial, Helvetica, sans-serif;
   font-size:1rem;
@@ -319,12 +322,6 @@
   justify-content:center;
   text-align:center;
   min-width:4rem;
-}
-.pa-agenda-tabs-square .pa-agenda-day-tab{
-  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px);
-  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px);
-  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px);
-  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px);
 }
 .pa-agenda-day-tab.active,
 .pa-agenda-day-tab:hover,
@@ -3537,22 +3534,10 @@ body.pa-program-entity-page .byline{
   outline:0!important;
   box-shadow:none!important;
 }
-.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab{
-  border:1px solid var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;
-  padding:.7rem 1.1rem!important;
-  min-width:4rem!important;
-  font-size:1rem!important;
-  line-height:1.1!important;
-}
-.pa-schedule .pa-agenda-day-tab.active,
-.pa-schedule .pa-agenda-day-tab:hover,
-.pa-schedule .pa-agenda-day-tab:focus{
-  box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset!important;
-}
 
-
-/* v1.19.005: force public agenda tab border controls to override theme/button defaults */
-.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab{
+/* v1.19.008: public agenda tab border controls */
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab,
+.pa-agenda-day-tabs .pa-agenda-day-tab[role="tab"]{
   border-style:solid!important;
   border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;
   border-top-width:var(--pa-agenda-tab-border-width-top, 1px)!important;
@@ -3569,32 +3554,14 @@ body.pa-program-entity-page .byline{
 .pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab.active,
 .pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:hover,
 .pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:focus,
-.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:focus-visible{
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:focus-visible,
+.pa-agenda-day-tabs .pa-agenda-day-tab[role="tab"].active,
+.pa-agenda-day-tabs .pa-agenda-day-tab[role="tab"]:hover,
+.pa-agenda-day-tabs .pa-agenda-day-tab[role="tab"]:focus,
+.pa-agenda-day-tabs .pa-agenda-day-tab[role="tab"]:focus-visible{
   box-shadow:none!important;
   outline:0!important;
 }
-
-
-/* v1.19.006: final public agenda tab override, independent of wrapper class */
-.pa-agenda-day-tabs .pa-agenda-day-tab,
-.pa-agenda-day-tab[role="tab"]{
-  box-shadow:none!important;
-  outline:0!important;
-}
-.pa-agenda-day-tabs .pa-agenda-day-tab.active,
-.pa-agenda-day-tabs .pa-agenda-day-tab:hover,
-.pa-agenda-day-tabs .pa-agenda-day-tab:focus,
-.pa-agenda-day-tabs .pa-agenda-day-tab:focus-visible,
-.pa-agenda-day-tab[role="tab"].active,
-.pa-agenda-day-tab[role="tab"]:hover,
-.pa-agenda-day-tab[role="tab"]:focus,
-.pa-agenda-day-tab[role="tab"]:focus-visible{
-  box-shadow:none!important;
-  outline:0!important;
-}
-
-
-/* v1.19.007: hard no-border public agenda tab state */
 .pa-agenda-tabs-no-border .pa-agenda-day-tab,
 .pa-agenda-tabs-no-border .pa-agenda-day-tab.active,
 .pa-agenda-tabs-no-border .pa-agenda-day-tab:hover,

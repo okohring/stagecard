@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.19.007
+ * Version: 1.19.008
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.19.007';
+    const VERSION = '1.19.008';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1398,7 +1398,6 @@ final class Program_Agenda_Plugin {
     private function agenda_controls($s) {
         $show_desc = $s['show_descriptions'] ?? 'hide';
         $display_mode = ($s['display_mode'] ?? 'tabs') === 'tabs' ? 'tabs' : 'stacked';
-        $tab_shape = ($s['tab_shape'] ?? 'rounded') === 'square' ? 'square' : 'rounded';
         $date_display = $s['date_display'] ?? 'numeric';
         if (!in_array($date_display, ['numeric','abbrev'], true)) { $date_display = 'numeric'; }
         $card_size = $this->normalize_agenda_card_size($s['card_size'] ?? 'full');
@@ -1773,7 +1772,6 @@ final class Program_Agenda_Plugin {
         $agenda = [
             'show_descriptions' => sanitize_key($agenda_in['show_descriptions'] ?? 'hide') === 'show' ? 'show' : 'hide',
             'display_mode' => sanitize_key($agenda_in['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs',
-            'tab_shape' => sanitize_key($agenda_in['tab_shape'] ?? 'rounded') === 'square' ? 'square' : 'rounded',
             'speaker_layout' => 'inline',
             'date_display' => in_array(sanitize_key($agenda_in['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? sanitize_key($agenda_in['date_display'] ?? 'numeric') : 'numeric',
             'card_size' => $this->normalize_agenda_card_size($agenda_in['card_size'] ?? 'full'),
@@ -1845,7 +1843,6 @@ final class Program_Agenda_Plugin {
         $agenda = [
             'show_descriptions' => sanitize_key($agenda_in['show_descriptions'] ?? 'hide') === 'show' ? 'show' : 'hide',
             'display_mode' => sanitize_key($agenda_in['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs',
-            'tab_shape' => sanitize_key($agenda_in['tab_shape'] ?? 'rounded') === 'square' ? 'square' : 'rounded',
             'speaker_layout' => 'inline',
             'date_display' => in_array(sanitize_key($agenda_in['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? sanitize_key($agenda_in['date_display'] ?? 'numeric') : 'numeric',
             'card_size' => $this->normalize_agenda_card_size($agenda_in['card_size'] ?? 'full'),
@@ -2676,7 +2673,6 @@ final class Program_Agenda_Plugin {
         $agenda = get_post_meta($program_id, '_pa_agenda_settings', true); if (!is_array($agenda)) { $agenda = []; }
         $show_desc = ($agenda['show_descriptions'] ?? get_post_meta($program_id, '_pa_show_event_descriptions', true) ?: 'hide') !== 'hide';
         $display_mode = ($agenda['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs';
-        $tab_shape = ($agenda['tab_shape'] ?? 'rounded') === 'square' ? 'square' : 'rounded';
         $date_display = $agenda['date_display'] ?? 'numeric';
         if (!in_array($date_display, ['numeric','abbrev'], true)) { $date_display = 'numeric'; }
         $card_size = $this->normalize_agenda_card_size($agenda['card_size'] ?? 'full');
@@ -2753,7 +2749,7 @@ final class Program_Agenda_Plugin {
                 $groups[$key][] = $event;
             }
             $uid = 'pa-day-tabs-' . absint($program_id);
-            echo '<div class="pa-agenda-day-tabs pa-agenda-tabs-' . esc_attr($tab_shape) . ($tab_has_any_border_width ? '' : ' pa-agenda-tabs-no-border') . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
+            echo '<div class="pa-agenda-day-tabs' . ($tab_has_any_border_width ? '' : ' pa-agenda-tabs-no-border') . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
             $i = 0;
             foreach ($groups as $date_key => $day_events) {
                 $label = $date_key === 'unscheduled' ? 'Unscheduled' : $this->format_agenda_date($date_key, $date_display);

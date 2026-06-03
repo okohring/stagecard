@@ -683,7 +683,6 @@ jQuery(function($){
       var ag=styles.agenda;
       $('[name="agenda[show_descriptions]"]').val(ag.show_descriptions || 'show');
       $('[name="agenda[display_mode]"]').val(ag.display_mode === 'tabs' ? 'tabs' : 'stacked');
-      $('[name="agenda[tab_shape]"]').val(ag.tab_shape === 'square' ? 'square' : 'rounded');
       $('[name="agenda[speaker_layout]"]').val('inline');
       var copiedCardSize = ag.card_size === 'thin' ? 'thin' : 'full';
       $('[name="agenda[card_size]"]').val(copiedCardSize);
@@ -693,6 +692,14 @@ jQuery(function($){
       setColor($('[name="agenda[accent_bar_color]"]').closest('.pa-color-control'), ag.accent_bar_color || '');
       setColor($('[name="agenda[title_color]"]').closest('.pa-color-control'), ag.title_color || ag.color || '');
       setColor($('[name="agenda[location_color]"]').closest('.pa-color-control'), ag.location_color || '');
+      setColor($('[name="agenda[tab_background_color]"]').closest('.pa-color-control'), ag.tab_background_color || '');
+      setColor($('[name="agenda[tab_border_color]"]').closest('.pa-color-control'), ag.tab_border_color || '');
+      if(ag.tab_border){
+        $('[name="agenda[tab_border][lock_radius]"]').prop('checked', !!ag.tab_border.lock_radius);
+        $('[name="agenda[tab_border][lock_width]"]').prop('checked', !!ag.tab_border.lock_width);
+        ['tl','tr','br','bl'].forEach(function(k){ $('[name="agenda[tab_border][radius_'+k+']"]').val((ag.tab_border['radius_'+k] !== undefined && ag.tab_border['radius_'+k] !== '') ? ag.tab_border['radius_'+k] : '999'); });
+        ['top','right','bottom','left'].forEach(function(k){ $('[name="agenda[tab_border][width_'+k+']"]').val((ag.tab_border['width_'+k] !== undefined && ag.tab_border['width_'+k] !== '') ? ag.tab_border['width_'+k] : '1'); });
+      }
       setProgramBorder('agenda', ag);
       setColor($('[name="agenda[border_color]"]').closest('.pa-color-control'), ag.border_color || '');
       updateAgendaPreview();
