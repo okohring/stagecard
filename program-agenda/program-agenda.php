@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.19.003
+ * Version: 1.19.007
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.19.003';
+    const VERSION = '1.19.007';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -2690,6 +2690,20 @@ final class Program_Agenda_Plugin {
         if (!empty($tab_bg_color)) { $tab_style .= '--pa-agenda-tab-bg:' . esc_attr($tab_bg_color) . ';'; }
         if (!empty($agenda['tab_border_color'])) { $tab_style .= '--pa-agenda-tab-border-color:' . esc_attr($agenda['tab_border_color']) . ';'; }
         $tab_border = isset($agenda['tab_border']) && is_array($agenda['tab_border']) ? $agenda['tab_border'] : [];
+        if (!$tab_border && isset($agenda['tab_border_width'])) {
+            $legacy_width = absint($agenda['tab_border_width']);
+            $legacy_radius = isset($agenda['tab_border_radius']) ? absint($agenda['tab_border_radius']) : 999;
+            $tab_border = [
+                'width_top' => $legacy_width,
+                'width_right' => $legacy_width,
+                'width_bottom' => $legacy_width,
+                'width_left' => $legacy_width,
+                'radius_tl' => $legacy_radius,
+                'radius_tr' => $legacy_radius,
+                'radius_br' => $legacy_radius,
+                'radius_bl' => $legacy_radius,
+            ];
+        }
         $tab_style .= '--pa-agenda-tab-border-width-top:' . absint($tab_border['width_top'] ?? 1) . 'px;';
         $tab_style .= '--pa-agenda-tab-border-width-right:' . absint($tab_border['width_right'] ?? 1) . 'px;';
         $tab_style .= '--pa-agenda-tab-border-width-bottom:' . absint($tab_border['width_bottom'] ?? 1) . 'px;';
@@ -2698,10 +2712,27 @@ final class Program_Agenda_Plugin {
         $tab_style .= '--pa-agenda-tab-radius-tr:' . absint($tab_border['radius_tr'] ?? 999) . 'px;';
         $tab_style .= '--pa-agenda-tab-radius-br:' . absint($tab_border['radius_br'] ?? 999) . 'px;';
         $tab_style .= '--pa-agenda-tab-radius-bl:' . absint($tab_border['radius_bl'] ?? 999) . 'px;';
-        $tab_shadow_width = (absint($tab_border['width_top'] ?? 1) || absint($tab_border['width_right'] ?? 1) || absint($tab_border['width_bottom'] ?? 1) || absint($tab_border['width_left'] ?? 1)) ? 2 : 0;
-        $tab_style .= '--pa-agenda-tab-active-shadow-width:' . $tab_shadow_width . 'px;';
         $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
         if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
+
+        $tab_has_any_border_width = (absint($tab_border['width_top'] ?? 1) || absint($tab_border['width_right'] ?? 1) || absint($tab_border['width_bottom'] ?? 1) || absint($tab_border['width_left'] ?? 1));
+        $tab_button_style = $tab_style;
+        if (!$tab_has_any_border_width) {
+            $tab_button_style .= 'border:0!important;border-width:0!important;border-style:none!important;';
+        } else {
+            $tab_button_style .= 'border-style:solid!important;';
+            $tab_button_style .= 'border-color:' . esc_attr($agenda['tab_border_color'] ?: 'transparent') . '!important;';
+            $tab_button_style .= 'border-top-width:' . absint($tab_border['width_top'] ?? 1) . 'px!important;';
+            $tab_button_style .= 'border-right-width:' . absint($tab_border['width_right'] ?? 1) . 'px!important;';
+            $tab_button_style .= 'border-bottom-width:' . absint($tab_border['width_bottom'] ?? 1) . 'px!important;';
+            $tab_button_style .= 'border-left-width:' . absint($tab_border['width_left'] ?? 1) . 'px!important;';
+        }
+        $tab_button_style .= 'border-top-left-radius:' . absint($tab_border['radius_tl'] ?? 999) . 'px!important;';
+        $tab_button_style .= 'border-top-right-radius:' . absint($tab_border['radius_tr'] ?? 999) . 'px!important;';
+        $tab_button_style .= 'border-bottom-right-radius:' . absint($tab_border['radius_br'] ?? 999) . 'px!important;';
+        $tab_button_style .= 'border-bottom-left-radius:' . absint($tab_border['radius_bl'] ?? 999) . 'px!important;';
+        $tab_button_style .= 'box-shadow:none!important;outline:0!important;';
+
         echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';
         echo '<div class="pa-agenda-content">';
         $render_agenda_event = function($event) use ($program_id) {
@@ -2722,11 +2753,11 @@ final class Program_Agenda_Plugin {
                 $groups[$key][] = $event;
             }
             $uid = 'pa-day-tabs-' . absint($program_id);
-            echo '<div class="pa-agenda-day-tabs pa-agenda-tabs-' . esc_attr($tab_shape) . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
+            echo '<div class="pa-agenda-day-tabs pa-agenda-tabs-' . esc_attr($tab_shape) . ($tab_has_any_border_width ? '' : ' pa-agenda-tabs-no-border') . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
             $i = 0;
             foreach ($groups as $date_key => $day_events) {
                 $label = $date_key === 'unscheduled' ? 'Unscheduled' : $this->format_agenda_date($date_key, $date_display);
-                echo '<button type="button" class="pa-agenda-day-tab' . ($i === 0 ? ' active' : '') . '" role="tab" aria-selected="' . ($i === 0 ? 'true' : 'false') . '" data-pa-day-target="' . esc_attr($uid . '-' . $i) . '">' . esc_html($label) . '</button>';
+                echo '<button type="button" class="pa-agenda-day-tab' . ($i === 0 ? ' active' : '') . '" style="' . esc_attr($tab_button_style) . '" role="tab" aria-selected="' . ($i === 0 ? 'true' : 'false') . '" data-pa-day-target="' . esc_attr($uid . '-' . $i) . '">' . esc_html($label) . '</button>';
                 $i++;
             }
             echo '</div><div class="pa-agenda-day-panels">';

@@ -330,7 +330,7 @@
 .pa-agenda-day-tab:hover,
 .pa-agenda-day-tab:focus{
   filter:brightness(.94);
-  box-shadow:0 0 0 var(--pa-agenda-tab-active-shadow-width, 2px) var(--pa-agenda-tab-border-color, currentColor) inset;
+  box-shadow:none!important;
 }
 .pa-agenda-day-panel{
   display:none;
@@ -3548,4 +3548,62 @@ body.pa-program-entity-page .byline{
 .pa-schedule .pa-agenda-day-tab:hover,
 .pa-schedule .pa-agenda-day-tab:focus{
   box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset!important;
+}
+
+
+/* v1.19.005: force public agenda tab border controls to override theme/button defaults */
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab{
+  border-style:solid!important;
+  border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;
+  border-top-width:var(--pa-agenda-tab-border-width-top, 1px)!important;
+  border-right-width:var(--pa-agenda-tab-border-width-right, 1px)!important;
+  border-bottom-width:var(--pa-agenda-tab-border-width-bottom, 1px)!important;
+  border-left-width:var(--pa-agenda-tab-border-width-left, 1px)!important;
+  border-top-left-radius:var(--pa-agenda-tab-radius-tl, 999px)!important;
+  border-top-right-radius:var(--pa-agenda-tab-radius-tr, 999px)!important;
+  border-bottom-right-radius:var(--pa-agenda-tab-radius-br, 999px)!important;
+  border-bottom-left-radius:var(--pa-agenda-tab-radius-bl, 999px)!important;
+  box-shadow:none!important;
+  outline:0!important;
+}
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab.active,
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:hover,
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:focus,
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab:focus-visible{
+  box-shadow:none!important;
+  outline:0!important;
+}
+
+
+/* v1.19.006: final public agenda tab override, independent of wrapper class */
+.pa-agenda-day-tabs .pa-agenda-day-tab,
+.pa-agenda-day-tab[role="tab"]{
+  box-shadow:none!important;
+  outline:0!important;
+}
+.pa-agenda-day-tabs .pa-agenda-day-tab.active,
+.pa-agenda-day-tabs .pa-agenda-day-tab:hover,
+.pa-agenda-day-tabs .pa-agenda-day-tab:focus,
+.pa-agenda-day-tabs .pa-agenda-day-tab:focus-visible,
+.pa-agenda-day-tab[role="tab"].active,
+.pa-agenda-day-tab[role="tab"]:hover,
+.pa-agenda-day-tab[role="tab"]:focus,
+.pa-agenda-day-tab[role="tab"]:focus-visible{
+  box-shadow:none!important;
+  outline:0!important;
+}
+
+
+/* v1.19.007: hard no-border public agenda tab state */
+.pa-agenda-tabs-no-border .pa-agenda-day-tab,
+.pa-agenda-tabs-no-border .pa-agenda-day-tab.active,
+.pa-agenda-tabs-no-border .pa-agenda-day-tab:hover,
+.pa-agenda-tabs-no-border .pa-agenda-day-tab:focus,
+.pa-agenda-tabs-no-border .pa-agenda-day-tab:focus-visible,
+.pa-agenda-tabs-no-border .pa-agenda-day-tab[role="tab"]{
+  border:0!important;
+  border-width:0!important;
+  border-style:none!important;
+  box-shadow:none!important;
+  outline:0!important;
 }

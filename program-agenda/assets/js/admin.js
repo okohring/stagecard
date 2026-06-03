@@ -561,16 +561,13 @@ jQuery(function($){
       if(titleCol) $tabs[0].style.setProperty('--pa-agenda-tab-color', titleCol);
       if(tabBorder) $tabs[0].style.setProperty('--pa-agenda-tab-border-color', tabBorder);
 
-      var hasTabBorderWidth = false;
       ['top','right','bottom','left'].forEach(function(side){
         var v=$('[name="agenda[tab_border][width_'+side+']"]').val();
         if(v !== undefined && v !== ''){
           var parsed = parseInt(v,10) || 0;
-          if(parsed > 0){ hasTabBorderWidth = true; }
           $tabs[0].style.setProperty('--pa-agenda-tab-border-width-'+side, parsed+'px');
         }
       });
-      $tabs[0].style.setProperty('--pa-agenda-tab-active-shadow-width', hasTabBorderWidth ? '2px' : '0px');
       var radiusMap={tl:'tl',tr:'tr',br:'br',bl:'bl'};
       Object.keys(radiusMap).forEach(function(k){
         var v=$('[name="agenda[tab_border][radius_'+k+']"]').val();
