@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.18.084
+ * Version: 1.18.086
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.18.084';
+    const VERSION = '1.18.086';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1483,12 +1483,12 @@ final class Program_Agenda_Plugin {
         }
 
         if ($type === 'speaker') {
-echo '<div class="pa-page-settings-section pa-page-settings-image-section"><div class="pa-field-heading">Speaker Page Image Settings</div><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[image_shape]"><option value="" ' . selected($s['image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
+echo '<div class="pa-page-settings-section pa-page-settings-image-section"><label class="pa-field-heading">Speaker Page Image Settings</label><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[image_shape]"><option value="" ' . selected($s['image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[image_border_width]" value="' . esc_attr($s['image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[image_border_color]', $s['image_border_color'] ?? '', '', 'Image border color', 'Speaker image border color');
             echo '</div></div>';
 
-echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-speaker-directory-image-settings"><div class="pa-field-heading">Speaker Directory Image Settings</div><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[directory_image_shape]"><option value="" ' . selected($s['directory_image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['directory_image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['directory_image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
+echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-speaker-directory-image-settings"><label class="pa-field-heading">Speaker Directory Image Settings</label><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[directory_image_shape]"><option value="" ' . selected($s['directory_image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['directory_image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['directory_image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[directory_image_border_width]" value="' . esc_attr($s['directory_image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[directory_image_border_color]', $s['directory_image_border_color'] ?? '', '', 'Image border color', 'Speaker directory image border color');
             echo '</div></div>';
