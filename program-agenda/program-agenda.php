@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.18.087
+ * Version: 1.19.000
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.18.087';
+    const VERSION = '1.19.000';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1396,10 +1396,13 @@ final class Program_Agenda_Plugin {
         echo '<label class="pa-field">Event descriptions <span>*</span><select class="pa-agenda-live-field" required name="agenda[show_descriptions]"><option value="show" ' . selected($show_desc, 'show', false) . '>Show</option><option value="hide" ' . selected($show_desc, 'hide', false) . '>Hide</option></select></label>';
         echo '<label class="pa-field">Agenda display <select class="pa-agenda-live-field" name="agenda[display_mode]"><option value="stacked" ' . selected($display_mode, 'stacked', false) . '>Stacked</option><option value="tabs" ' . selected($display_mode, 'tabs', false) . '>Tabs by day</option></select></label>';
         echo '<input type="hidden" class="pa-agenda-live-field" name="agenda[speaker_layout]" value="inline">';
-        echo '<label class="pa-field">Tab shape <select class="pa-agenda-live-field" name="agenda[tab_shape]"><option value="rounded" ' . selected($tab_shape, 'rounded', false) . '>Rounded</option><option value="square" ' . selected($tab_shape, 'square', false) . '>Square</option></select></label>';
         echo '<div class="pa-agenda-tab-color-row">';
         echo $this->color_control('agenda[tab_background_color]', $s['tab_background_color'] ?? '', '', 'Tab color', 'Agenda tab color');
         echo $this->color_control('agenda[tab_border_color]', $s['tab_border_color'] ?? '', '', 'Tab border color', 'Agenda tab border color');
+        echo '</div>';
+        echo '<div class="pa-agenda-options-row pa-agenda-tab-border-controls">';
+        echo '<label class="pa-field">Tab border width<input class="pa-agenda-live-field" type="number" min="0" name="agenda[tab_border_width]" value="' . esc_attr($s['tab_border_width'] ?? 1) . '" placeholder="1"></label>';
+        echo '<label class="pa-field">Tab border radius<input class="pa-agenda-live-field" type="number" min="0" name="agenda[tab_border_radius]" value="' . esc_attr($s['tab_border_radius'] ?? 999) . '" placeholder="999"></label>';
         echo '</div>';
         echo '<label class="pa-field">Date display <select class="pa-agenda-live-field" name="agenda[date_display]"><option value="numeric" ' . selected($date_display, 'numeric', false) . '>8/20</option><option value="abbrev" ' . selected($date_display, 'abbrev', false) . '>Aug. 20</option></select></label>';
         echo '<label class="pa-field">Card size <select class="pa-agenda-live-field" name="agenda[card_size]"><option value="full" ' . selected($card_size, 'full', false) . '>Full: compact speaker cards</option><option value="thin" ' . selected($card_size, 'thin', false) . '>Thin: title/meta only</option></select></label>';
@@ -1483,12 +1486,14 @@ final class Program_Agenda_Plugin {
         }
 
         if ($type === 'speaker') {
-echo '<div class="pa-page-settings-section pa-page-settings-image-section"><label class="pa-field-heading">Speaker Page Image Settings</label><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[image_shape]"><option value="" ' . selected($s['image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
+            echo '<div class="pa-page-settings-section pa-page-settings-image-section"><h5>Speaker Page Image Settings</h5><div class="pa-image-options-row">';
+            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[image_shape]"><option value="" ' . selected($s['image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[image_border_width]" value="' . esc_attr($s['image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[image_border_color]', $s['image_border_color'] ?? '', '', 'Image border color', 'Speaker image border color');
             echo '</div></div>';
 
-echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-speaker-directory-image-settings"><label class="pa-field-heading">Speaker Directory Image Settings</label><div class="pa-image-options-row">';            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[directory_image_shape]"><option value="" ' . selected($s['directory_image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['directory_image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['directory_image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
+            echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-speaker-directory-image-settings"><h5>Speaker Directory Image Settings</h5><div class="pa-image-options-row">';
+            echo '<label class="pa-field">Image shape<select name="' . esc_attr($root) . '[directory_image_shape]"><option value="" ' . selected($s['directory_image_shape'] ?? '', '', false) . '>Theme/default</option><option value="square" ' . selected($s['directory_image_shape'] ?? '', 'square', false) . '>Square</option><option value="circle" ' . selected($s['directory_image_shape'] ?? '', 'circle', false) . '>Circle</option></select></label>';
             echo '<label class="pa-field">Image border width<input type="number" min="0" name="' . esc_attr($root) . '[directory_image_border_width]" value="' . esc_attr($s['directory_image_border_width'] ?? 0) . '" placeholder="0"></label>';
             echo $this->color_control($root . '[directory_image_border_color]', $s['directory_image_border_color'] ?? '', '', 'Image border color', 'Speaker directory image border color');
             echo '</div></div>';
@@ -1745,6 +1750,8 @@ echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-spe
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
             'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
             'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
+            'tab_border_width' => isset($agenda_in['tab_border_width']) && $agenda_in['tab_border_width'] !== '' ? absint($agenda_in['tab_border_width']) : 1,
+            'tab_border_radius' => isset($agenda_in['tab_border_radius']) && $agenda_in['tab_border_radius'] !== '' ? absint($agenda_in['tab_border_radius']) : 999,
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -1816,6 +1823,8 @@ echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-spe
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
             'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
             'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
+            'tab_border_width' => isset($agenda_in['tab_border_width']) && $agenda_in['tab_border_width'] !== '' ? absint($agenda_in['tab_border_width']) : 1,
+            'tab_border_radius' => isset($agenda_in['tab_border_radius']) && $agenda_in['tab_border_radius'] !== '' ? absint($agenda_in['tab_border_radius']) : 999,
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -2649,6 +2658,8 @@ echo '<div class="pa-page-settings-section pa-page-settings-image-section pa-spe
         $tab_bg_color = $agenda['tab_background_color'] ?? ($agenda['background'] ?? '');
         if (!empty($tab_bg_color)) { $tab_style .= '--pa-agenda-tab-bg:' . esc_attr($tab_bg_color) . ';'; }
         if (!empty($agenda['tab_border_color'])) { $tab_style .= '--pa-agenda-tab-border-color:' . esc_attr($agenda['tab_border_color']) . ';'; }
+        if (isset($agenda['tab_border_width']) && $agenda['tab_border_width'] !== '') { $tab_style .= '--pa-agenda-tab-border-width:' . absint($agenda['tab_border_width']) . 'px;'; }
+        if (isset($agenda['tab_border_radius']) && $agenda['tab_border_radius'] !== '') { $tab_style .= '--pa-agenda-tab-border-radius:' . absint($agenda['tab_border_radius']) . 'px;'; }
         $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
         if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
         echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';
