@@ -182,6 +182,13 @@
 .pa-agenda-options-row .pa-color-control{
   margin:0;
 }
+.pa-agenda-tab-color-row{
+  grid-column:1 / -1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:22px;
+  align-items:start;
+}
 .pa-event-card-preview-description{
   margin-top:18px!important;
   color:inherit;
@@ -189,7 +196,8 @@
 @media(max-width:900px){
   .pa-agenda-behavior-row,
   .pa-agenda-color-row,
-  .pa-agenda-border-row{
+  .pa-agenda-border-row,
+  .pa-agenda-tab-color-row{
     grid-template-columns:1fr;
     max-width:none;
   }
@@ -333,7 +341,7 @@
 .pa-collapsible-border .pa-border-section{margin:12px}
 .pa-agenda-tabs-preview{display:flex;gap:8px;margin:18px 0 -4px;flex-wrap:wrap}
 .pa-agenda-tabs-preview[hidden]{display:none!important}
-.pa-agenda-tabs-preview button{border:1px solid #dcdcde;background:#fff;color:inherit;border-radius:999px;padding:8px 14px;cursor:default;font:inherit}
+.pa-agenda-tabs-preview button{border:1px solid #dcdcde;background:#fff;color:inherit;border-radius:999px;padding:11px 18px;min-width:64px;cursor:default;font:inherit;font-size:1rem}
 .pa-agenda-tabs-preview button.is-square{border-radius:0}
 .pa-agenda-tabs-preview button.active{box-shadow:0 0 0 2px currentColor inset}
 .pa-speaker-card-preview,.pa-speaker-card-preview *{color:inherit}

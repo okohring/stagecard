@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.15.144
+ * Version: 1.18.081
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.15.144';
+    const VERSION = '1.18.081';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -1397,6 +1397,10 @@ final class Program_Agenda_Plugin {
         echo '<label class="pa-field">Agenda display <select class="pa-agenda-live-field" name="agenda[display_mode]"><option value="stacked" ' . selected($display_mode, 'stacked', false) . '>Stacked</option><option value="tabs" ' . selected($display_mode, 'tabs', false) . '>Tabs by day</option></select></label>';
         echo '<input type="hidden" class="pa-agenda-live-field" name="agenda[speaker_layout]" value="inline">';
         echo '<label class="pa-field">Tab shape <select class="pa-agenda-live-field" name="agenda[tab_shape]"><option value="rounded" ' . selected($tab_shape, 'rounded', false) . '>Rounded</option><option value="square" ' . selected($tab_shape, 'square', false) . '>Square</option></select></label>';
+        echo '<div class="pa-agenda-tab-color-row">';
+        echo $this->color_control('agenda[tab_background_color]', $s['tab_background_color'] ?? '', '', 'Tab color', 'Agenda tab color');
+        echo $this->color_control('agenda[tab_border_color]', $s['tab_border_color'] ?? '', '', 'Tab border color', 'Agenda tab border color');
+        echo '</div>';
         echo '<label class="pa-field">Date display <select class="pa-agenda-live-field" name="agenda[date_display]"><option value="numeric" ' . selected($date_display, 'numeric', false) . '>8/20</option><option value="abbrev" ' . selected($date_display, 'abbrev', false) . '>Aug. 20</option></select></label>';
         echo '<label class="pa-field">Card size <select class="pa-agenda-live-field" name="agenda[card_size]"><option value="full" ' . selected($card_size, 'full', false) . '>Full: compact speaker cards</option><option value="thin" ' . selected($card_size, 'thin', false) . '>Thin: title/meta only</option></select></label>';
         echo '</div></details>';
@@ -1735,6 +1739,8 @@ final class Program_Agenda_Plugin {
             'accent_bar_color' => sanitize_hex_color($agenda_in['accent_bar_color'] ?? '') ?: '',
             'title_color' => sanitize_hex_color($agenda_in['title_color'] ?? ($agenda_in['color'] ?? '')) ?: '',
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
+            'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
+            'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -1804,6 +1810,8 @@ final class Program_Agenda_Plugin {
             'accent_bar_color' => sanitize_hex_color($agenda_in['accent_bar_color'] ?? '') ?: '',
             'title_color' => sanitize_hex_color($agenda_in['title_color'] ?? ($agenda_in['color'] ?? '')) ?: '',
             'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
+            'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
+            'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
             'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
         ];
         $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
@@ -2631,9 +2639,12 @@ final class Program_Agenda_Plugin {
         $cat_map = []; foreach ($cats as $c) { $cat_map[$c['name']] = $c; }
         ob_start();
         $schedule_style = '';
-        if (!empty($agenda['background'])) { $schedule_style .= '--pa-agenda-tab-bg:' . esc_attr($agenda['background']) . ';'; }
+        $tab_style = '';
+        $tab_bg_color = $agenda['tab_background_color'] ?? ($agenda['background'] ?? '');
+        if (!empty($tab_bg_color)) { $tab_style .= '--pa-agenda-tab-bg:' . esc_attr($tab_bg_color) . ';'; }
+        if (!empty($agenda['tab_border_color'])) { $tab_style .= '--pa-agenda-tab-border-color:' . esc_attr($agenda['tab_border_color']) . ';'; }
         $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
-        if (!empty($tab_text_color)) { $schedule_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
+        if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
         echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';
         echo '<div class="pa-agenda-content">';
         $render_agenda_event = function($event) use ($program_id) {
@@ -2654,7 +2665,7 @@ final class Program_Agenda_Plugin {
                 $groups[$key][] = $event;
             }
             $uid = 'pa-day-tabs-' . absint($program_id);
-            echo '<div class="pa-agenda-day-tabs pa-agenda-tabs-' . esc_attr($tab_shape) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
+            echo '<div class="pa-agenda-day-tabs pa-agenda-tabs-' . esc_attr($tab_shape) . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
             $i = 0;
             foreach ($groups as $date_key => $day_events) {
                 $label = $date_key === 'unscheduled' ? 'Unscheduled' : $this->format_agenda_date($date_key, $date_display);

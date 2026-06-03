@@ -518,7 +518,7 @@ jQuery(function($){
     $p.attr('style','');
     $p.find('.pa-event-card__title,.pa-event-card__title a,.pa-event-card__location,.pa-event-card__category-text,.pa-event-card__category-icon,.pa-event-card__meta-dot,.pa-event-card__description').attr('style','');
     $p.find('.pa-event-card__datebar,.pa-event-card__body').attr('style','');
-    var bg=$('[name="agenda[background]"]').val(), accentBar=$('[name="agenda[accent_bar_color]"]').val(), titleCol=$('[name="agenda[title_color]"]').val() || $('[name="agenda[color]"]').val(), locCol=$('[name="agenda[location_color]"]').val(), bc=$('[name="agenda[border_color]"]').val();
+    var bg=$('[name="agenda[background]"]').val(), accentBar=$('[name="agenda[accent_bar_color]"]').val(), titleCol=$('[name="agenda[title_color]"]').val() || $('[name="agenda[color]"]').val(), locCol=$('[name="agenda[location_color]"]').val(), bc=$('[name="agenda[border_color]"]').val(), tabBg=$('[name="agenda[tab_background_color]"]').val(), tabBorder=$('[name="agenda[tab_border_color]"]').val();
     if(bg){
       $p.css({'background-color':bg,'--pa-agenda-card-bg':bg});
       $p.find('.pa-event-card__body').css('background-color',bg);
@@ -554,7 +554,11 @@ jQuery(function($){
     var mode=$('[name="agenda[display_mode]"]').val();
     $tabs.prop('hidden', mode !== 'tabs');
     if(mode === 'tabs'){
-      var tabCss={}; if(bg) tabCss.backgroundColor=bg; if(titleCol) tabCss.color=titleCol;
+      var tabCss={};
+      var effectiveTabBg = tabBg || bg;
+      if(effectiveTabBg) tabCss.backgroundColor=effectiveTabBg;
+      if(titleCol) tabCss.color=titleCol;
+      if(tabBorder) tabCss.borderColor=tabBorder;
       $tabs.find('button').attr('style','').css(tabCss).toggleClass('is-square', $('[name="agenda[tab_shape]"]').val() === 'square');
     }
     var display=$('[name="agenda[date_display]"]').val();

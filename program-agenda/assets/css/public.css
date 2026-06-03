@@ -297,19 +297,20 @@
 }
 .pa-agenda-day-tab{
   appearance:none;
-  border:1px solid color-mix(in srgb,currentColor 25%,transparent);
+  border:1px solid var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent));
   background:var(--pa-agenda-tab-bg, transparent);
   color:var(--pa-agenda-tab-color, inherit);
-  padding:.55rem .9rem;
+  padding:.7rem 1.1rem;
   border-radius:999px;
   cursor:pointer;
   font-family: Montserrat, Arial, Helvetica, sans-serif;
+  font-size:1rem;
   line-height:1.1;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   text-align:center;
-  min-width:3.5rem;
+  min-width:4rem;
 }
 .pa-agenda-tabs-square .pa-agenda-day-tab{
   border-radius:0;
@@ -318,7 +319,7 @@
 .pa-agenda-day-tab:hover,
 .pa-agenda-day-tab:focus{
   filter:brightness(.94);
-  box-shadow:0 0 0 2px currentColor inset;
+  box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset;
 }
 .pa-agenda-day-panel{
   display:none;
@@ -754,7 +755,7 @@
   }
 }
 
-.pa-agenda-day-tab{border-color:color-mix(in srgb,currentColor 25%,transparent)!important;}
+.pa-agenda-day-tab{border-color:var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;}
 
 /* v79 cleanup: event card borders, filters, and removed width feature */
 .pa-schedule{
@@ -3503,4 +3504,27 @@ body.pa-program-entity-page .byline{
   .pa-program-speaker-card{
     max-width:240px!important;
   }
+}
+
+
+/* v1.18.081: keep agenda tab border controls scoped to date tab buttons only, while preserving larger tab sizing. */
+.pa-schedule,
+.pa-schedule .pa-agenda-content,
+.pa-schedule .pa-agenda-day-tabs,
+.pa-schedule .pa-agenda-day-panels{
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+}
+.pa-schedule .pa-agenda-day-tabs .pa-agenda-day-tab{
+  border:1px solid var(--pa-agenda-tab-border-color, color-mix(in srgb,currentColor 25%,transparent))!important;
+  padding:.7rem 1.1rem!important;
+  min-width:4rem!important;
+  font-size:1rem!important;
+  line-height:1.1!important;
+}
+.pa-schedule .pa-agenda-day-tab.active,
+.pa-schedule .pa-agenda-day-tab:hover,
+.pa-schedule .pa-agenda-day-tab:focus{
+  box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset!important;
 }
