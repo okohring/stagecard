@@ -1987,7 +1987,7 @@ body.pa-program-entity-page .byline{
   padding:14px 12px!important;
   text-align:center!important;
   overflow:hidden!important;
-  margin:-1px 0 -1px -1px!important;
+  margin:0 -1px 0 0!important;
   align-self:stretch!important;
 }
 .pa-event-card__date,
@@ -2022,6 +2022,7 @@ body.pa-program-entity-page .byline{
   align-items:flex-start!important;
   text-align:left!important;
   overflow:hidden!important;
+  margin-left:-1px!important;
 }
 .pa-event-card__summary{
   box-sizing:border-box!important;
