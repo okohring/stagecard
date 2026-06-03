@@ -2745,7 +2745,7 @@ body.pa-program-entity-page .byline{
 
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, 450px)!important;
+  grid-template-columns:repeat(2, 500px)!important;
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
@@ -2756,7 +2756,7 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
-  width:450px!important;
+  width:500px!important;
   height:300px!important;
   margin:0 auto!important;
   display:flex!important;
@@ -2765,7 +2765,7 @@ body.pa-program-entity-page .byline{
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
-  width:450px!important;
+  width:500px!important;
   height:300px!important;
   object-fit:contain!important;
   display:block!important;
@@ -2780,8 +2780,8 @@ body.pa-program-entity-page .byline{
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo,
   .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
     width:100%!important;
-    max-width:350px!important;
-    height:200px!important;
+    max-width:500px!important;
+    height:300px!important;
   }
 }
 
@@ -2792,7 +2792,7 @@ body.pa-program-entity-page .byline{
   justify-content:center!important;
   justify-items:center!important;
   align-items:center!important;
-  gap:32px 48px!important;
+  gap:32px 50px!important;
   width:100%!important;
   max-width:900px!important;
   margin:0 auto!important;
@@ -3470,7 +3470,7 @@ body.pa-program-entity-page .byline{
 }
 .pa-single-event-speaker-sections .pa-single-event-speaker-section .pa-speaker-card-list{
   display:grid!important;
-  grid-template-columns:repeat(4,minmax(0,230px))!important;
+  grid-template-columns:repeat(4,minmax(0,250px))!important;
   gap:12px!important;
   align-items:start!important;
   justify-items:start!important;
