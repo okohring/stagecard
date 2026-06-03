@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.19.002
+ * Version: 1.19.003
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.19.002';
+    const VERSION = '1.19.003';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -2698,6 +2698,8 @@ final class Program_Agenda_Plugin {
         $tab_style .= '--pa-agenda-tab-radius-tr:' . absint($tab_border['radius_tr'] ?? 999) . 'px;';
         $tab_style .= '--pa-agenda-tab-radius-br:' . absint($tab_border['radius_br'] ?? 999) . 'px;';
         $tab_style .= '--pa-agenda-tab-radius-bl:' . absint($tab_border['radius_bl'] ?? 999) . 'px;';
+        $tab_shadow_width = (absint($tab_border['width_top'] ?? 1) || absint($tab_border['width_right'] ?? 1) || absint($tab_border['width_bottom'] ?? 1) || absint($tab_border['width_left'] ?? 1)) ? 2 : 0;
+        $tab_style .= '--pa-agenda-tab-active-shadow-width:' . $tab_shadow_width . 'px;';
         $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
         if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
         echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';

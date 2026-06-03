@@ -22218,5 +22218,5 @@
 }
 .pa-agenda-tabs-preview .pa-agenda-day-tab.active{
   filter:brightness(.94);
-  box-shadow:0 0 0 2px var(--pa-agenda-tab-border-color, currentColor) inset;
+  box-shadow:0 0 0 var(--pa-agenda-tab-active-shadow-width, 2px) var(--pa-agenda-tab-border-color, currentColor) inset;
 }
