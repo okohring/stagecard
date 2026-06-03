@@ -3069,7 +3069,11 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
             $is_primary_sponsor_level = ($primary_sponsor_level !== '' && $level === $primary_sponsor_level);
 
 echo '<section class="pa-sponsor-level-group' . ($is_primary_sponsor_level ? ' pa-sponsor-level-group--primary' : '') . '">';
-echo '<h3>' . esc_html($level) . '</h3>';
+if ($is_primary_sponsor_level) {
+    echo '<h3>' . esc_html($level) . '</h3>';
+} else {
+    echo '<h4>' . esc_html($level) . '</h4>';
+}
 echo '<div class="pa-sponsor-logo-grid">';
             foreach ($level_sponsors as $sponsor) { echo $this->sponsor_showcase_logo($sponsor); }
             echo '</div></section>';

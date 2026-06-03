@@ -2730,16 +2730,25 @@ body.pa-program-entity-page .byline{
 @media(max-width:640px){.pa-sponsor-logo-grid{grid-template-columns:repeat(auto-fit,minmax(150px,250px))!important;justify-content:center!important;max-width:none!important;}.pa-sponsor-showcase-logo,.pa-sponsor-showcase-name{width:min(250px,100%)!important;}.pa-sponsor-showcase-logo-img{max-width:100%!important;}}
 
 /*Adding Primary Level to Sponsor Showcase */
-.pa-sponsor-level-group > h3{
+.pa-sponsor-level-group > h3,
+.pa-sponsor-level-group > h4{
   text-align:center!important;
+}
+
+.pa-sponsor-level-group:not(.pa-sponsor-level-group--primary) > h4{
+  margin:0 0 18px!important;
+}
+
+.pa-sponsor-level-group--primary > h3{
+  margin:0 0 28px!important;
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-logo-grid{
   display:grid!important;
-  grid-template-columns:repeat(2, minmax(0, 350px))!important;
+  grid-template-columns:repeat(2, 350px)!important;
   justify-content:center!important;
   align-items:center!important;
-  gap:24px!important;
+  gap:75px!important;
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
