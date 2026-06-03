@@ -2747,8 +2747,12 @@ body.pa-program-entity-page .byline{
   display:grid!important;
   grid-template-columns:repeat(2, 350px)!important;
   justify-content:center!important;
+  justify-items:center!important;
   align-items:center!important;
-  gap:75px!important;
+  gap:48px 72px!important;
+  width:100%!important;
+  max-width:820px!important;
+  margin:0 auto!important;
 }
 
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo{
@@ -2759,10 +2763,13 @@ body.pa-program-entity-page .byline{
   align-items:center!important;
   justify-content:center!important;
 }
+
 .pa-sponsor-level-group--primary .pa-sponsor-showcase-logo-img{
   width:350px!important;
   height:200px!important;
   object-fit:contain!important;
+  display:block!important;
+  margin:0 auto!important;
 }
 
 @media(max-width:796px){
