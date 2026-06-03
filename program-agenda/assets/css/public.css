@@ -3453,6 +3453,7 @@ body.pa-program-entity-page .byline{
   transform-origin:center center!important;
   transition:transform 180ms ease!important;
   will-change:transform!important;
+  line-height:0!important;
 }
 .pa-program-speaker-image-link:hover,
 .pa-program-speaker-image-link:focus-visible{

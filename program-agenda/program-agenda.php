@@ -2839,17 +2839,19 @@ final class Program_Agenda_Plugin {
         $directory_image_radius = $directory_image_shape === 'circle' ? '50%' : ($directory_image_shape === 'square' ? '0' : '');
         $directory_image_border_width = isset($speaker_page_settings['directory_image_border_width']) && $speaker_page_settings['directory_image_border_width'] !== '' ? absint($speaker_page_settings['directory_image_border_width']) : 0;
         $directory_image_border_color = !empty($speaker_page_settings['directory_image_border_color']) ? sanitize_hex_color($speaker_page_settings['directory_image_border_color']) : '';
-        $directory_image_frame_style = 'box-sizing:border-box;position:relative;overflow:hidden;line-height:0;';
-        $directory_image_inner_style = 'box-sizing:border-box;display:block;width:100%;height:100%;object-fit:cover;object-position:center center;border:0;margin:0;padding:0;';
-        $directory_image_overlay_style = 'display:none;';
-        if ($directory_image_radius !== '') {
-            $directory_image_frame_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;';
-            $directory_image_inner_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;';
-        }
-        if ($directory_image_border_width > 0) {
-            $directory_image_overlay_style = 'display:block;position:absolute;inset:0;z-index:2;box-sizing:border-box;pointer-events:none;border-style:solid;border-width:' . $directory_image_border_width . 'px;border-color:' . esc_attr($directory_image_border_color ?: 'currentColor') . ';';
-            if ($directory_image_radius !== '') { $directory_image_overlay_style .= 'border-radius:' . esc_attr($directory_image_radius) . ' !important;'; }
-        }
+       $directory_image_frame_style = 'box-sizing:border-box!important;position:relative!important;overflow:hidden!important;line-height:0!important;border:0!important;';
+        $directory_image_inner_style = 'box-sizing:border-box!important;display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:cover!important;object-position:center center!important;border:0!important;margin:0!important;padding:0!important;';
+
+    if ($directory_image_radius !== '') {
+        $directory_image_frame_style .= 'border-radius:' . esc_attr($directory_image_radius) . '!important;';
+        $directory_image_inner_style .= 'border-radius:' . esc_attr($directory_image_radius) . '!important;';
+}
+
+    if ($directory_image_border_width > 0) {
+    $directory_image_frame_style .= 'padding:' . $directory_image_border_width . 'px!important;background:' . esc_attr($directory_image_border_color ?: 'currentColor') . '!important;';
+}   else {
+    $directory_image_frame_style .= 'padding:0!important;background:transparent!important;';
+}
 
         ob_start();
         echo '<section class="pa-program-speakers" aria-label="Program speakers">';
@@ -2866,7 +2868,6 @@ final class Program_Agenda_Plugin {
             } else {
                 echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" style="' . esc_attr($directory_image_inner_style) . '" aria-hidden="true"></span>';
             }
-            if ($directory_image_border_width > 0) { echo '<span class="pa-program-speaker-image-border" style="' . esc_attr($directory_image_overlay_style) . '" aria-hidden="true"></span>'; }
             echo '</a>';
             echo '<h3 class="pa-program-speaker-name"><a href="' . esc_url($permalink) . '">' . esc_html($speaker->post_title) . '</a></h3>';
             if ($role) { echo '<p class="pa-program-speaker-role">' . esc_html($role) . '</p>'; }
