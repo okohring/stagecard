@@ -22217,6 +22217,5 @@
   cursor:default;
 }
 .pa-agenda-tabs-preview .pa-agenda-day-tab.active{
-  filter:brightness(.94);
   box-shadow:none!important;
 }
