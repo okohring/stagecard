@@ -327,7 +327,7 @@
 .pa-agenda-day-tab.active,
 .pa-agenda-day-tab:hover,
 .pa-agenda-day-tab:focus{
-  filter:brightness(.80);
+  transform:scale(1.15);
   box-shadow:none!important;
 }
 .pa-agenda-day-panel{
@@ -3164,7 +3164,7 @@ body.pa-program-entity-page .byline{
 /* Stagecard agenda date/time font */
 .pa-event-card .pa-event-card__date,
 .pa-event-card .pa-event-card__time{
-  font-family: Arial, Helvetica, sans-serif !important;
+  font-family: Montserrat, Arial, Helvetica, sans-serif !important;
 }
 
 /* Stagecard event card spacing */
@@ -3329,7 +3329,7 @@ body.pa-program-entity-page .byline{
   font-weight:400!important;
   font-variation-settings:"wght" 400!important;
 }
-.pa-event-card .pa-event-card__date,
+.pa-agenda-day-tab, .pa-event-card .pa-event-card__date,
 .pa-event-card .pa-event-card__time,
 .pa-event-card .pa-speaker-card-category-label,
 .pa-single-event-speaker-section-heading{
