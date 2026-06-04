@@ -3852,3 +3852,8 @@ body.pa-program-entity-page .byline{
     line-height:1.12!important;
   }
 }
+
+/* Add right-side breathing room inside the accent/date bar */
+.pa-event-card__datebar{
+  padding-right:17px!important;
+}
