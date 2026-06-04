@@ -3717,63 +3717,55 @@ body.pa-program-entity-page .byline{
 }
 
 /* =========================================================
-   Stagecard final event-card seam fix
-   Keeps Safari/mobile from showing a hairline gap between
-   the accent/date bar and the event card body.
+   Stagecard event-card left-edge reset
+   Removes card border/overlay artifacts on mobile Safari.
    ========================================================= */
+
 .pa-event-card{
-  --pa-event-card-datebar-width:64px;
-  position:relative!important;
-  display:grid!important;
-  grid-template-columns:var(--pa-event-card-datebar-width) minmax(0,1fr)!important;
-  gap:0!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
   overflow:hidden!important;
-  isolation:isolate!important;
   background:var(--pa-agenda-card-bg,#fff)!important;
   background-color:var(--pa-agenda-card-bg,#fff)!important;
-  transform:translateZ(0)!important;
 }
 
-/* Paint the accent bar from the card itself, slightly under the body.
-   If Safari creates a subpixel gap, the gap reveals the accent color. */
-.pa-event-card::before{
-  content:""!important;
-  position:absolute!important;
-  top:0!important;
-  left:0!important;
-  bottom:0!important;
-  width:calc(var(--pa-event-card-datebar-width,64px) + 8px)!important;
-  background:var(--pa-agenda-bar-color,#1d2327)!important;
-  pointer-events:none!important;
-  z-index:0!important;
-}
-
-/* Keep any border overlay above the card, but do not let it create an inner seam. */
+/* Fully remove the old overlay border and pseudo accent layers. */
+.pa-event-card::before,
 .pa-event-card::after{
-  pointer-events:none!important;
+  display:none!important;
+  content:none!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  background:none!important;
 }
 
+/* Let the actual datebar be the accent bar. No fake left border, no bleed. */
 .pa-event-card__datebar{
   grid-column:1!important;
   grid-row:1!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
   position:relative!important;
-  z-index:2!important;
-  left:auto!important;
+  z-index:1!important;
+  left:0!important;
   right:auto!important;
-  top:auto!important;
+  top:0!important;
   bottom:auto!important;
   width:100%!important;
+  max-width:100%!important;
   height:auto!important;
   min-height:0!important;
   margin:0!important;
   padding:14px 12px!important;
-  align-self:stretch!important;
-  overflow:hidden!important;
-  background:transparent!important;
-  background-color:transparent!important;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
+  background-color:var(--pa-agenda-bar-color,#1d2327)!important;
   border:0!important;
+  outline:0!important;
   box-shadow:none!important;
-  transform:translateZ(0)!important;
+  transform:none!important;
+  overflow:hidden!important;
 }
 
 .pa-event-card__datebar::before,
@@ -3782,11 +3774,7 @@ body.pa-program-entity-page .byline{
   content:none!important;
 }
 
-.pa-event-card__datebar > *{
-  position:relative!important;
-  z-index:1!important;
-}
-
+/* Undo the old top/right/body bleed. */
 .pa-event-card__body{
   grid-column:2!important;
   grid-row:1!important;
@@ -3794,7 +3782,7 @@ body.pa-program-entity-page .byline{
   z-index:1!important;
   left:auto!important;
   right:auto!important;
-  top:auto!important;
+  top:0!important;
   bottom:auto!important;
   width:100%!important;
   max-width:100%!important;
@@ -3802,48 +3790,56 @@ body.pa-program-entity-page .byline{
   min-height:0!important;
   margin:0!important;
   margin-left:0!important;
-  align-self:stretch!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
   background:var(--pa-agenda-card-bg,#fff)!important;
   background-color:var(--pa-agenda-card-bg,#fff)!important;
-  transform:translateZ(0)!important;
+  transform:none!important;
 }
 
-/* Keep mobile from reintroducing hover movement or body shifts. */
 @media(max-width:768px){
   .pa-event-card,
   .pa-event-card:hover,
   .pa-event-card:focus-within{
-    grid-template-columns:var(--pa-event-card-datebar-width) minmax(0,1fr)!important;
-    transform:translateZ(0)!important;
+    border:0!important;
+    outline:0!important;
+    box-shadow:none!important;
+    transform:none!important;
   }
 
   .pa-event-card__datebar,
   .pa-event-card:hover .pa-event-card__datebar,
   .pa-event-card:focus-within .pa-event-card__datebar{
-    width:100%!important;
-    left:auto!important;
+    left:0!important;
     right:auto!important;
-    top:auto!important;
-    transform:translateZ(0)!important;
-  }
-
-  .pa-event-card__datebar > *,
-  .pa-event-card:hover .pa-event-card__datebar > *,
-  .pa-event-card:focus-within .pa-event-card__datebar > *{
+    top:0!important;
+    bottom:auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    box-shadow:none!important;
     transform:none!important;
   }
 
   .pa-event-card__body,
   .pa-event-card:hover .pa-event-card__body,
   .pa-event-card:focus-within .pa-event-card__body{
+    left:auto!important;
+    right:auto!important;
+    top:0!important;
+    bottom:auto!important;
+    width:100%!important;
+    max-width:100%!important;
+    height:auto!important;
+    min-height:0!important;
     margin-left:0!important;
-    padding-left:18px!important;
-    transform:translateZ(0)!important;
+    transform:none!important;
   }
 
-  .pa-event-card.pa-event-card--size-thin .pa-event-card__body,
-  .pa-event-card.pa-event-card--size-thin:hover .pa-event-card__body,
-  .pa-event-card.pa-event-card--size-thin:focus-within .pa-event-card__body{
-    padding-left:14px!important;
+  .pa-event-card__datebar > *,
+  .pa-event-card:hover .pa-event-card__datebar > *,
+  .pa-event-card:focus-within .pa-event-card__datebar > *{
+    transform:none!important;
   }
 }
