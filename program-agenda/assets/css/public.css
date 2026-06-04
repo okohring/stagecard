@@ -1963,7 +1963,6 @@ body.pa-program-entity-page .byline{
   width:100%!important;
   max-width:100%!important;
   min-height:165px!important;
-  overflow:hidden!important;
   background:var(--pa-agenda-card-bg,transparent)!important;
   color:inherit!important;
   border:0px solid color-mix(in srgb,currentColor 18%,transparent);
@@ -1986,7 +1985,6 @@ body.pa-program-entity-page .byline{
   gap:4px!important;
   padding:14px 12px!important;
   text-align:center!important;
-  overflow:hidden!important;
   margin:0!important;
   align-self:stretch!important;
   position:relative!important;
@@ -3718,37 +3716,48 @@ body.pa-program-entity-page .byline{
   outline:0!important;
 }
 
-/* Final Safari/mobile seam fix between agenda date bar and event card body */
+/* Final Safari/mobile seam fix: cover subpixel gap from the accent bar itself */
 .pa-event-card{
   overflow:hidden!important;
   isolation:isolate!important;
-  background:var(--pa-agenda-card-bg, transparent)!important;
 }
 
 .pa-event-card__datebar{
   position:relative!important;
-  z-index:3!important;
+  z-index:5!important;
   margin:0!important;
   overflow:visible!important;
   border-right:0!important;
   background:var(--pa-agenda-bar-color,#1d2327)!important;
+  box-shadow:8px 0 0 0 var(--pa-agenda-bar-color,#1d2327)!important;
 }
 
 .pa-event-card__datebar::after{
-  content:"";
-  position:absolute;
-  top:0;
-  right:-4px;
-  bottom:0;
-  width:6px;
-  background:var(--pa-agenda-bar-color,#1d2327)!important;
-  pointer-events:none;
-  z-index:4;
+  display:none!important;
+  content:none!important;
 }
 
 .pa-event-card__body{
   position:relative!important;
   z-index:1!important;
   margin-left:0!important;
-  background:var(--pa-agenda-card-bg, transparent)!important;
+  background:var(--pa-agenda-card-bg,transparent)!important;
+}
+
+/* Backup for older agenda-card markup, in case any shortcode still uses it */
+.pa-agenda-category-bar{
+  position:relative!important;
+  z-index:5!important;
+  margin:0!important;
+  overflow:visible!important;
+  border-right:0!important;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
+  box-shadow:8px 0 0 0 var(--pa-agenda-bar-color,#1d2327)!important;
+}
+
+.pa-agenda-main{
+  position:relative!important;
+  z-index:1!important;
+  margin-left:0!important;
+  background:var(--pa-agenda-card-bg,transparent)!important;
 }
