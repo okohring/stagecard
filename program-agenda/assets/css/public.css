@@ -3715,3 +3715,37 @@ body.pa-program-entity-page .byline{
   box-shadow:none!important;
   outline:0!important;
 }
+
+/* event card cleanup */
+/* Final Safari/mobile seam fix between agenda date bar and card body */
+.pa-event-card{
+  overflow:hidden!important;
+  isolation:isolate!important;
+}
+
+.pa-event-card__datebar{
+  position:relative!important;
+  z-index:3!important;
+  margin:0!important;
+  overflow:visible!important;
+  border-right:0!important;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
+}
+
+.pa-event-card__datebar::after{
+  content:"";
+  position:absolute;
+  top:0;
+  right:-8px;
+  bottom:0;
+  width:10px;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
+  pointer-events:none;
+  z-index:4;
+}
+
+.pa-event-card__body{
+  position:relative!important;
+  z-index:1!important;
+  margin-left:0!important;
+}
