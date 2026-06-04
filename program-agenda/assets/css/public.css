@@ -1966,7 +1966,7 @@ body.pa-program-entity-page .byline{
   overflow:hidden!important;
   background:var(--pa-agenda-card-bg,transparent)!important;
   color:inherit!important;
-  border:1px solid color-mix(in srgb,currentColor 18%,transparent);
+  border:0px solid color-mix(in srgb,currentColor 18%,transparent);
 }
 .pa-event-card__datebar{
   box-sizing:border-box!important;
@@ -2094,12 +2094,14 @@ body.pa-program-entity-page .byline{
 .pa-event-card__location a,
 .pa-event-card__meta-dot{
   color:var(--pa-agenda-location-color,inherit)!important;
+  align-content:center;
 }
 .pa-event-card__invite-icon{
   display:inline-flex!important;
-  width:1em!important;
-  height:1em!important;
+  width:1.3em!important;
+  height:1.3em!important;
   color:var(--pa-agenda-location-color,inherit)!important;
+  align-content:center;
   vertical-align:-.12em!important;
 }
 .pa-event-card__invite-icon svg{display:block!important;width:100%!important;height:100%!important;}
