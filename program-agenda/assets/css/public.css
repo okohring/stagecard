@@ -1991,7 +1991,7 @@ body.pa-program-entity-page .byline{
   align-self:stretch!important;
   position:relative!important;
   z-index:2!important;
-  border-right:0!important;
+  border-left:-1!important;
 }
 .pa-event-card__datebar::after{
   content:"";
@@ -3718,11 +3718,11 @@ body.pa-program-entity-page .byline{
   outline:0!important;
 }
 
-/* event card cleanup */
-/* Final Safari/mobile seam fix between agenda date bar and card body */
+/* Final Safari/mobile seam fix between agenda date bar and event card body */
 .pa-event-card{
   overflow:hidden!important;
   isolation:isolate!important;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
 }
 
 .pa-event-card__datebar{
@@ -3750,4 +3750,5 @@ body.pa-program-entity-page .byline{
   position:relative!important;
   z-index:1!important;
   margin-left:0!important;
+  background:var(--pa-agenda-card-bg,transparent)!important;
 }
