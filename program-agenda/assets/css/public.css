@@ -1986,23 +1986,12 @@ body.pa-program-entity-page .byline{
   gap:4px!important;
   padding:14px 12px!important;
   text-align:center!important;
-  overflow:hidden!important;
+  overflow:visible!important;
   margin:0!important;
   align-self:stretch!important;
   position:relative!important;
   z-index:2!important;
   border-right:0!important;
-}
-.pa-event-card__datebar::after{
-  content:"";
-  position:absolute;
-  top:0;
-  right:-3px;
-  bottom:0;
-  width:6px;
-  background:var(--pa-agenda-bar-color,#1d2327);
-  pointer-events:none;
-  z-index:3;
 }
 .pa-event-card__date,
 .pa-event-card__time{
@@ -2036,7 +2025,7 @@ body.pa-program-entity-page .byline{
   align-items:flex-start!important;
   text-align:left!important;
   overflow:hidden!important;
-  margin-left:0px!important;
+  margin-left:0!important;
 }
 .pa-event-card__summary{
   box-sizing:border-box!important;
@@ -2235,84 +2224,7 @@ body.pa-program-entity-page .byline{
   }
   .pa-event-card.pa-event-card--size-thin .pa-event-card__body{padding:10px 14px!important;}
 }
-
-/* v1.15.99: remove faint inner seams between the event-card border, accent bar, and content panel. */
-.pa-event-card{
-  gap:0!important;
-  border-spacing:0!important;
-  background:var(--pa-agenda-card-bg,#fff)!important;
-  background-clip:padding-box!important;
-  isolation:isolate!important;
-}
-.pa-event-card__datebar,
-.pa-event-card__body{
-  align-self:stretch!important;
-  margin:0!important;
-  min-height:100%!important;
-}
-.pa-event-card__datebar{
-  box-shadow:1px 0 0 var(--pa-agenda-bar-color,#1d2327)!important;
-}
-.pa-event-card__body{
-  background:var(--pa-agenda-card-bg,#fff)!important;
-}
-
-/* v1.15.100: hard seam fix. Draw the card border as an overlay instead of a layout border, so the accent bar/body sit directly under it with no visible gutter. */
-.pa-event-card{
-  border:0!important;
-  position:relative!important;
-  background:var(--pa-agenda-card-bg,#fff)!important;
-  background-color:var(--pa-agenda-card-bg,#fff)!important;
-  overflow:hidden!important;
-}
-.pa-event-card::after{
-  content:""!important;
-  display:block!important;
-  position:absolute!important;
-  inset:0!important;
-  pointer-events:none!important;
-  z-index:10!important;
-  border:1px solid color-mix(in srgb,currentColor 18%,transparent)!important;
-  box-sizing:border-box!important;
-}
-.pa-event-card__datebar,
-.pa-event-card__body{
-  height:100%!important;
-  min-height:0!important;
-  margin:0!important;
-}
-.pa-event-card__datebar{
-  background-color:var(--pa-agenda-bar-color,#1d2327)!important;
-}
-.pa-event-card__body{
-  background-color:var(--pa-agenda-card-bg,#fff)!important;
-}
-
-/* v1.15.101: final edge-bleed fix for card hairlines.
-   The accent bar and body now extend 2px underneath the overlay border, removing sub-pixel gaps at the outer edges and during slant hover. */
-.pa-event-card{
-  grid-auto-rows:1fr!important;
-}
-.pa-event-card__datebar{
-  top:-2px!important;
-  left:-2px!important;
-  width:calc(100% + 4px)!important;
-  height:calc(100% + 4px)!important;
-  min-height:calc(100% + 4px)!important;
-  transform:translateZ(0)!important;
-}
-.pa-event-card__body{
-  top:-2px!important;
-  right:-2px!important;
-  width:calc(100% + 4px)!important;
-  height:calc(100% + 4px)!important;
-  min-height:calc(100% + 4px)!important;
-  transform:translateZ(0)!important;
-}
-
-.pa-event-card::after{
-  border-radius:inherit!important;
-}/* Stagecard final public layout cleanup: event cards, sponsor showcase, sponsor pages */
+/* Stagecard final public layout cleanup: event cards, sponsor showcase, sponsor pages */
 .pa-event-card{
   --pa-event-card-datebar-width:64px;
   box-sizing:border-box!important;
@@ -3716,36 +3628,54 @@ body.pa-program-entity-page .byline{
   outline:0!important;
 }
 
-/* event card cleanup */
-/* Final Safari/mobile seam fix between agenda date bar and card body */
+
+/* =========================================================
+   Stagecard final event-card seam fix
+   Purpose: hides Safari/mobile subpixel seam between the date bar and body.
+   Keep this AFTER the main .pa-event-card component rules.
+   ========================================================= */
 .pa-event-card{
+  position:relative!important;
   overflow:hidden!important;
   isolation:isolate!important;
+  border:0!important;
+  background:var(--pa-agenda-bar-color,#1d2327)!important;
+  background-color:var(--pa-agenda-bar-color,#1d2327)!important;
+  transform:translateZ(0);
+}
+
+.pa-event-card::after{
+  content:""!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:20!important;
+  pointer-events:none!important;
+  box-sizing:border-box!important;
+  border:1px solid color-mix(in srgb,currentColor 18%,transparent)!important;
 }
 
 .pa-event-card__datebar{
   position:relative!important;
-  z-index:3!important;
+  z-index:5!important;
   margin:0!important;
   overflow:visible!important;
-  border-right:0!important;
   background:var(--pa-agenda-bar-color,#1d2327)!important;
+  background-color:var(--pa-agenda-bar-color,#1d2327)!important;
+  border-right:0!important;
+  box-shadow:8px 0 0 var(--pa-agenda-bar-color,#1d2327)!important;
+  transform:translateZ(0);
 }
 
 .pa-event-card__datebar::after{
-  content:"";
-  position:absolute;
-  top:0;
-  right:-8px;
-  bottom:0;
-  width:10px;
-  background:var(--pa-agenda-bar-color,#1d2327)!important;
-  pointer-events:none;
-  z-index:4;
+  content:none!important;
+  display:none!important;
 }
 
 .pa-event-card__body{
   position:relative!important;
   z-index:1!important;
   margin-left:0!important;
+  background:var(--pa-agenda-card-bg,#fff)!important;
+  background-color:var(--pa-agenda-card-bg,#fff)!important;
+  transform:translateZ(0);
 }
