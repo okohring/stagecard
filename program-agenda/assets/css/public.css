@@ -1987,8 +1987,22 @@ body.pa-program-entity-page .byline{
   padding:14px 12px!important;
   text-align:center!important;
   overflow:hidden!important;
-  margin:0 -1px 0 0!important;
+  margin:0!important;
   align-self:stretch!important;
+  position:relative!important;
+  z-index:2!important;
+  border-right:0!important;
+}
+.pa-event-card__datebar::after{
+  content:"";
+  position:absolute;
+  top:0;
+  right:-3px;
+  bottom:0;
+  width:6px;
+  background:var(--pa-agenda-bar-color,#1d2327);
+  pointer-events:none;
+  z-index:3;
 }
 .pa-event-card__date,
 .pa-event-card__time{
@@ -2022,7 +2036,7 @@ body.pa-program-entity-page .byline{
   align-items:flex-start!important;
   text-align:left!important;
   overflow:hidden!important;
-  margin-left:-1px!important;
+  margin-left:0px!important;
 }
 .pa-event-card__summary{
   box-sizing:border-box!important;
