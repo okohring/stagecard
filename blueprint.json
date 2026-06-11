@@ -15,7 +15,7 @@
   "step": "installTheme",
   "themeData": {
     "resource": "wordpress.org/themes",
-    "slug": "twentytwentyfour"
+    "slug": "ollie"
   },
   "options": {
     "activate": true
