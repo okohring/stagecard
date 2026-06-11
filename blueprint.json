@@ -36,6 +36,11 @@
   "step": "runPHP",
   "code": "<?php require_once '/wordpress/wp-load.php'; add_action('admin_head', function() { echo '<style>.pa-wrap{--pa-theme-primary:#7c3aed!important;--pa-theme-secondary:#a78bfa!important;--pa-theme-tertiary:#f3e8ff!important;}</style>'; }); file_put_contents(WP_CONTENT_DIR . '/mu-plugins/stagecard-demo-colors.php', \"<?php add_action('admin_head', function() { echo '<style>.pa-wrap{--pa-theme-primary:#7c3aed!important;--pa-theme-secondary:#a78bfa!important;--pa-theme-tertiary:#f3e8ff!important;}</style>'; });\"); ?>"
 }
+    ,
+    {
+  "step": "runPHP",
+  "code": "<?php require_once '/wordpress/wp-load.php'; $dir = WP_CONTENT_DIR . '/mu-plugins'; if (!is_dir($dir)) { mkdir($dir, 0755, true); } file_put_contents($dir . '/stagecard-demo-colors.php', \"<?php add_action('admin_head', function() { echo '<style>.pa-wrap{--pa-theme-primary:#7c3aed!important;--pa-theme-secondary:#a78bfa!important;--pa-theme-tertiary:#f3e8ff!important;}</style>'; });\"); ?>"
+}
   ]
 }
 
