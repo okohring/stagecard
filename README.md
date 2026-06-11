@@ -30,4 +30,5 @@ program-agenda/
 Do not use GitHub's automatic "Source code" ZIP as the WordPress plugin ZIP. Use the packaged plugin ZIP that contains the correct `program-agenda` folder.
 
 [Try Stagecard in WordPress Playground]
+
 (https://playground.wordpress.net/?blueprint-url=https%3A%2F%2Fraw.githubusercontent.com%2Fokohring%2Fstagecard%2Frefs%2Fheads%2Fmain%2Fblueprint.json)
