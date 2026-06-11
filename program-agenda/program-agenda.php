@@ -291,232 +291,79 @@ final class Program_Agenda_Plugin {
             $this->append_hex_color($colors, $color);
         }
 
-        return array_slice($colors, 0, 6);
+        return $colors;
+    }
+
+    private function salient_palette_colors() {
+        $colors = [];
+        $option_names = ['salient_redux', 'nectar_redux', 'redux_options'];
+        $keys = ['accent-color','extra-color-1','extra-color-2','extra-color-3','color-accent-color','color-extra-color-1','color-extra-color-2','color-extra-color-3'];
+        foreach ($option_names as $option_name) {
+            $options = get_option($option_name, []);
+            if (!is_array($options)) { continue; }
+            foreach ($keys as $key) {
+                if (!empty($options[$key])) { $this->append_hex_color($colors, $options[$key]); }
+            }
+        }
+        return $colors;
+    }
+
+    private function theme_mod_palette_colors() {
+        $colors = [];
+        $mods = function_exists('get_theme_mods') ? get_theme_mods() : [];
+        if (!is_array($mods)) { return $colors; }
+        foreach ($mods as $key => $value) {
+            if (is_string($value) && preg_match('/color|accent|palette/i', (string)$key)) {
+                $this->append_hex_color($colors, $value);
+            } elseif (is_array($value) && preg_match('/color|accent|palette/i', (string)$key)) {
+                array_walk_recursive($value, function($item) use (&$colors) {
+                    if (is_string($item)) { $this->append_hex_color($colors, $item); }
+                });
+            }
+        }
+        return $colors;
+    }
+
+    private function theme_option_palette_colors() {
+        $colors = [];
+        global $wpdb;
+        if (!$wpdb) { return $colors; }
+        $rows = $wpdb->get_results("SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE '%theme%' OR option_name LIKE '%salient%' OR option_name LIKE '%nectar%' LIMIT 40");
+        foreach ((array)$rows as $row) {
+            $value = maybe_unserialize($row->option_value ?? '');
+            $this->append_colors_from_value($colors, $value);
+            if (count($colors) >= 6) { break; }
+        }
+        return $colors;
+    }
+
+    private function append_colors_from_value(&$colors, $value) {
+        if (is_string($value)) {
+            if (strlen($value) > 8000) { return; }
+            if (preg_match_all('/#(?:[A-Fa-f0-9]{3}){1,2}\b/', $value, $matches)) {
+                foreach ($matches[0] as $color) { $this->append_hex_color($colors, $color); }
+            }
+        } elseif (is_array($value)) {
+            foreach ($value as $key => $item) {
+                if (is_string($key) && preg_match('/color|accent|palette/i', $key)) {
+                    $this->append_colors_from_value($colors, $item);
+                } elseif (is_array($item)) {
+                    $this->append_colors_from_value($colors, $item);
+                }
+                if (count($colors) >= 6) { break; }
+            }
+        }
     }
 
     private function append_hex_color(&$colors, $color) {
         if (!is_string($color)) { return; }
         $color = trim($color);
-        if (preg_match('/^#([A-Fa-f0-9]{3}){1,2}$/', $color)) {
-            $normalized = sanitize_hex_color($color);
-            if ($normalized && !in_array(strtolower($normalized), array_map('strtolower', $colors), true)) {
-                $colors[] = $normalized;
-            }
-        }
-    }
-
-    private function theme_mod_palette_colors() {
-        $colors = [];
-        if (!function_exists('get_theme_mods')) { return $colors; }
-        $mods = get_theme_mods();
-        if (!is_array($mods)) { return $colors; }
-
-        $preferred_keys = [
-            'accent_color', 'primary_color', 'secondary_color', 'tertiary_color',
-            'link_color', 'button_color', 'background_color', 'header_textcolor',
-            'text_color', 'heading_color', 'main_color', 'brand_color',
-        ];
-
-        foreach ($preferred_keys as $key) {
-            if (isset($mods[$key])) {
-                $value = (string) $mods[$key];
-                if ($key === 'background_color' || $key === 'header_textcolor') {
-                    $value = '#' . ltrim($value, '#');
-                }
-                $this->append_hex_color($colors, $value);
-            }
-        }
-
-        $this->scan_theme_color_values($mods, $colors, true);
-        return array_slice($colors, 0, 6);
-    }
-
-    private function theme_option_palette_colors() {
-        $colors = [];
-        if (!function_exists('wp_get_theme')) { return $colors; }
-
-        $theme = wp_get_theme();
-        $keys = array_filter(array_unique([
-            strtolower((string) $theme->get_stylesheet()),
-            strtolower((string) $theme->get_template()),
-            strtolower((string) $theme->get('TextDomain')),
-        ]));
-
-        $option_names = [];
-        foreach ($keys as $key) {
-            $option_names[] = $key;
-            $option_names[] = $key . '_options';
-            $option_names[] = $key . '_theme_options';
-            $option_names[] = 'theme_mods_' . $key;
-        }
-        $option_names = array_unique($option_names);
-
-        foreach ($option_names as $option_name) {
-            $option_value = get_option($option_name);
-            if (is_array($option_value)) {
-                $this->scan_theme_color_values($option_value, $colors, false);
-            }
-            if (count($colors) >= 6) { break; }
-        }
-
-        return array_slice($colors, 0, 6);
-    }
-
-    private function scan_theme_color_values($value, &$colors, $scan_all = false, $path = '') {
-        if (!is_array($value)) { return; }
-        foreach ($value as $key => $child) {
-            $key_string = strtolower((string) $key);
-            $child_path = $path === '' ? $key_string : $path . '.' . $key_string;
-            $looks_relevant = $scan_all || strpos($child_path, 'color') !== false || strpos($child_path, 'colour') !== false || strpos($child_path, 'palette') !== false || strpos($child_path, 'accent') !== false || strpos($child_path, 'brand') !== false;
-
-            if (is_string($child) && $looks_relevant) {
-                $candidate = $child;
-                if (preg_match('/^[A-Fa-f0-9]{6}$/', $candidate)) {
-                    $candidate = '#' . $candidate;
-                }
-                $this->append_hex_color($colors, $candidate);
-            } elseif (is_array($child)) {
-                $this->scan_theme_color_values($child, $colors, $scan_all, $child_path);
-            }
-            if (count($colors) >= 6) { return; }
-        }
-    }
-
-    private function salient_palette_colors() {
-        $colors = [];
-        $is_salient = false;
-        if (function_exists('wp_get_theme')) {
-            $theme = wp_get_theme();
-            $name = strtolower((string) $theme->get('Name'));
-            $template = strtolower((string) $theme->get_template());
-            $stylesheet = strtolower((string) $theme->get_stylesheet());
-            $is_salient = strpos($name, 'salient') !== false || strpos($template, 'salient') !== false || strpos($stylesheet, 'salient') !== false;
-        }
-
-        $option_sets = [];
-        if (function_exists('get_nectar_theme_options')) {
-            $nectar_options = get_nectar_theme_options();
-            if (is_array($nectar_options)) { $option_sets[] = $nectar_options; }
-        }
-        if (isset($GLOBALS['nectar_options']) && is_array($GLOBALS['nectar_options'])) {
-            $option_sets[] = $GLOBALS['nectar_options'];
-        }
-
-        foreach (['salient', 'salient_redux', 'salient_options', 'salient_theme_options', 'nectar_options', 'redux_options'] as $option_name) {
-            $option_value = get_option($option_name);
-            if (is_array($option_value)) { $option_sets[] = $option_value; }
-        }
-
-        $preferred_keys = [
-            'accent-color', 'accent_color', 'accent-color-2', 'accent_color_2',
-            'extra-color-1', 'extra_color_1', 'extra-color-2', 'extra_color_2', 'extra-color-3', 'extra_color_3',
-            'extra-color-gradient-1', 'extra_color_gradient_1', 'extra-color-gradient-2', 'extra_color_gradient_2',
-        ];
-
-        foreach ($option_sets as $set) {
-            foreach ($preferred_keys as $key) {
-                if (isset($set[$key])) { $this->append_hex_color($colors, $set[$key]); }
-            }
-        }
-
-        foreach ($option_sets as $set) {
-            $this->scan_salient_color_values($set, $colors, $is_salient);
-        }
-
-        return $colors;
-    }
-
-    private function scan_salient_color_values($value, &$colors, $is_salient, $path = '') {
-        if (!is_array($value)) { return; }
-        foreach ($value as $key => $child) {
-            $key_string = strtolower((string) $key);
-            $child_path = $path === '' ? $key_string : $path . '.' . $key_string;
-            $looks_relevant = $is_salient || strpos($child_path, 'accent') !== false || strpos($child_path, 'extra-color') !== false || strpos($child_path, 'extra_color') !== false || strpos($child_path, 'nectar') !== false;
-            if (is_string($child) && $looks_relevant) {
-                $this->append_hex_color($colors, $child);
-            } elseif (is_array($child)) {
-                $this->scan_salient_color_values($child, $colors, $is_salient, $child_path);
-            }
-            if (count($colors) >= 6) { return; }
-        }
-    }
-
-    private function program_categories_for_js() {
-        $map = [];
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
-        foreach ($programs as $program) {
-            $cats = get_post_meta($program->ID, '_pa_categories', true);
-            $names = [];
-            if (is_array($cats)) {
-                foreach ($cats as $cat) {
-                    if (!empty($cat['name'])) { $names[] = $cat['name']; }
-                }
-            }
-            $map[$program->ID] = array_values(array_unique($names));
-        }
-        return $map;
-    }
-
-    private function program_dates_for_js() {
-        $map = [];
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
-        foreach ($programs as $program) { $map[$program->ID] = $this->program_date_options($program->ID); }
-        return $map;
-    }
-
-    private function program_sponsor_levels_for_js() {
-        $map = [];
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
-        foreach ($programs as $program) {
-            $levels = get_post_meta($program->ID, '_pa_sponsor_levels', true);
-            if (!is_array($levels)) { $levels = []; }
-            $map[$program->ID] = array_values(array_filter(array_map('sanitize_text_field', $levels)));
-        }
-        return $map;
-    }
-
-    private function program_date_options($program_id) {
-        $program_id = absint($program_id);
-        $dates = [];
-        $add = static function($date) use (&$dates) {
-            $date = sanitize_text_field($date);
-            if ($date && !isset($dates[$date])) {
-                $ts = strtotime($date);
-                $dates[$date] = $ts ? date_i18n('F j, Y', $ts) : $date;
-            }
-        };
-        $add_range = static function($start, $end) use (&$add) {
-            $start = sanitize_text_field($start);
-            $end = sanitize_text_field($end);
-            if (!$start && !$end) { return; }
-            if (!$start || !$end) { $add($start ?: $end); return; }
-            try {
-                $start_dt = new DateTime($start);
-                $end_dt = new DateTime($end);
-                if ($end_dt < $start_dt) { $tmp = $start_dt; $start_dt = $end_dt; $end_dt = $tmp; }
-                while ($start_dt <= $end_dt) {
-                    $add($start_dt->format('Y-m-d'));
-                    $start_dt->modify('+1 day');
-                }
-            } catch (Exception $e) {
-                $add($start);
-                $add($end);
-            }
-        };
-        $add_range(get_post_meta($program_id, '_pa_program_start_date', true), get_post_meta($program_id, '_pa_program_end_date', true));
-        $additional = get_post_meta($program_id, '_pa_program_additional_dates', true);
-        if (is_array($additional)) {
-            foreach ($additional as $range) {
-                if (is_array($range)) { $add_range($range['start'] ?? '', $range['end'] ?? ''); }
-            }
-        }
-        return $dates;
+        if (!preg_match('/^#(?:[A-Fa-f0-9]{3}){1,2}$/', $color)) { return; }
+        $color = strtoupper($color);
+        if (!in_array($color, $colors, true)) { $colors[] = $color; }
     }
 
     public function public_assets() {
-        if (!is_singular(['pa_event', 'pa_speaker', 'pa_sponsor']) && !$this->page_has_pa_shortcode()) {
-            return;
-        }
         wp_enqueue_style('pa-montserrat', 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap', [], null);
         wp_enqueue_style('pa-public', plugin_dir_url(__FILE__) . 'assets/css/public.css', [], self::VERSION);
         wp_add_inline_style('pa-public', $this->public_inline_css());
@@ -628,13 +475,14 @@ final class Program_Agenda_Plugin {
     }
 
     private function bulk_actions($post_type) {
-        if (!in_array($post_type, ['pa_event','pa_sponsor'], true)) { return; }
+        if (!in_array($post_type, ['pa_event','pa_speaker','pa_sponsor'], true)) { return; }
         $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC']);
+        $program_label = $post_type === 'pa_speaker' ? 'Assign program style' : 'Assign program';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-bulk-form" data-pa-bulk-form="' . esc_attr($post_type) . '">';
         wp_nonce_field('pa_bulk_items_' . $post_type);
         echo '<input type="hidden" name="action" value="pa_bulk_items"><input type="hidden" name="post_type" value="' . esc_attr($post_type) . '">';
         echo '<div class="pa-bulk-toolbar"><label><span>Action</span><select name="bulk_action" class="pa-bulk-action-select"><option value="">No status/delete action</option><option value="draft">Move to Draft</option><option value="delete">Delete</option></select></label>';
-        echo '<label class="pa-bulk-program-field"><span>Assign program</span><select name="bulk_program_id" class="pa-bulk-program-select"><option value="">Assign program</option>';
+        echo '<label class="pa-bulk-program-field"><span>' . esc_html($program_label) . '</span><select name="bulk_program_id" class="pa-bulk-program-select"><option value="">' . esc_html($program_label) . '</option>';
         foreach ($programs as $program) {
             $levels = get_post_meta($program->ID, '_pa_sponsor_levels', true);
             if (!is_array($levels)) { $levels = []; }
@@ -649,7 +497,7 @@ final class Program_Agenda_Plugin {
     }
 
     private function close_bulk_actions($post_type) {
-        if (in_array($post_type, ['pa_event','pa_sponsor'], true)) { echo '</form>'; }
+        if (in_array($post_type, ['pa_event','pa_speaker','pa_sponsor'], true)) { echo '</form>'; }
     }
 
     private function sponsor_program_ids($sponsor_id) {
@@ -855,8 +703,9 @@ final class Program_Agenda_Plugin {
         $this->list_search('Search speakers', 'Search speakers by name, company, role, or credentials');
         echo '<a class="pa-add-new" href="' . esc_url(admin_url('admin.php?page=program-edit-speaker')) . '">Add new</a>';
         $this->status_tabs(admin_url('admin.php?page=program-speakers'), 'pa_speaker');
+        $this->bulk_actions('pa_speaker');
         $items = $this->query_items('pa_speaker');
-        echo '<table class="pa-table pa-sortable-table"><thead><tr>' . $this->sortable_th('Name') . $this->sortable_th('Company') . $this->sortable_th('Program style') . $this->sortable_th('Page') . $this->sortable_th('Author') . $this->sortable_th('Date Created', 'date') . '<th></th></tr></thead><tbody>';
+        echo '<table class="pa-table pa-sortable-table"><thead><tr><th class="pa-select-col"><label class="screen-reader-text" for="pa-select-all-speakers">Select all speakers</label><input type="checkbox" id="pa-select-all-speakers" class="pa-bulk-check-all"></th>' . $this->sortable_th('Name') . $this->sortable_th('Company') . $this->sortable_th('Program style') . $this->sortable_th('Page') . $this->sortable_th('Author') . $this->sortable_th('Date Created', 'date') . '<th></th></tr></thead><tbody>';
         foreach ($items as $p) {
             $company = get_post_meta($p->ID, '_pa_speaker_company', true);
             $author = get_the_author_meta('display_name', $p->post_author);
@@ -865,11 +714,12 @@ final class Program_Agenda_Plugin {
             $style_program_id = $this->speaker_primary_program_id($p->ID);
             $style_program_title = $style_program_id ? get_the_title($style_program_id) : '';
             $search_terms = $this->normalize_search_terms([$p->post_title, $company, $role, $credentials, $author, get_the_date('', $p), $style_program_title]);
-            echo '<tr class="pa-searchable-row" data-pa-search="' . esc_attr($search_terms) . '"><td><a href="' . esc_url(admin_url('admin.php?page=program-edit-speaker&id=' . $p->ID)) . '">' . esc_html($p->post_title) . '</a></td><td>' . esc_html($company) . '</td><td>' . ($style_program_title ? esc_html($style_program_title) : '&mdash;') . '</td><td><a href="' . esc_url(get_permalink($p)) . '" target="_blank" rel="noopener">View page</a></td><td>' . esc_html($author) . '</td><td>' . esc_html(get_the_date('', $p)) . '</td><td>' . $this->row_actions($p) . '</td></tr>';
+            echo '<tr class="pa-searchable-row" data-pa-search="' . esc_attr($search_terms) . '"><td class="pa-select-col"><input type="checkbox" class="pa-bulk-item-check" name="item_ids[]" value="' . esc_attr($p->ID) . '"></td><td><a href="' . esc_url(admin_url('admin.php?page=program-edit-speaker&id=' . $p->ID)) . '">' . esc_html($p->post_title) . '</a></td><td>' . esc_html($company) . '</td><td>' . ($style_program_title ? esc_html($style_program_title) : '&mdash;') . '</td><td><a href="' . esc_url(get_permalink($p)) . '" target="_blank" rel="noopener">View page</a></td><td>' . esc_html($author) . '</td><td>' . esc_html(get_the_date('', $p)) . '</td><td>' . $this->row_actions($p) . '</td></tr>';
         }
-        if ($items) { echo '<tr class="pa-list-search-empty" hidden><td colspan="7">No matching speakers found.</td></tr>'; }
-        if (!$items) { echo '<tr><td colspan="7">No speakers found.</td></tr>'; }
+        if ($items) { echo '<tr class="pa-list-search-empty" hidden><td colspan="8">No matching speakers found.</td></tr>'; }
+        if (!$items) { echo '<tr><td colspan="8">No speakers found.</td></tr>'; }
         echo '</tbody></table>';
+        $this->close_bulk_actions('pa_speaker');
         echo '</div>';
     }
 
@@ -1077,427 +927,275 @@ final class Program_Agenda_Plugin {
         }
 
         $agenda = get_post_meta($id, '_pa_agenda_settings', true);
-        if (!is_array($agenda)) { $agenda = []; }
-        $show_desc = get_post_meta($id, '_pa_show_event_descriptions', true);
-        if (!$agenda && $show_desc) { $agenda['show_descriptions'] = $show_desc; }
         $speaker_card = get_post_meta($id, '_pa_speaker_card_settings', true);
-        if (!is_array($speaker_card)) { $speaker_card = []; }
-        $event_page_settings = get_post_meta($id, self::META_EVENT_SETTINGS, true);
-        if (!is_array($event_page_settings)) { $event_page_settings = []; }
-        $speaker_page_settings = get_post_meta($id, self::META_SPEAKER_SETTINGS, true);
-        if (!is_array($speaker_page_settings)) { $speaker_page_settings = []; }
-
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-form pa-comfortable-form pa-program-form pa-program-advanced-only-form">';
-        wp_nonce_field('pa_save_program_advanced');
-        echo '<input type="hidden" name="action" value="pa_save_program_advanced"><input type="hidden" name="id" value="' . esc_attr($id) . '">';
-        echo '<section class="pa-program-advanced-settings pa-program-advanced-settings-standalone"><div class="pa-program-advanced-inner">';
-        $this->program_advanced_settings_module($agenda, $speaker_card, $event_page_settings, $speaker_page_settings);
-        echo '</div></section>';
-        echo '<p><button type="submit" class="button button-primary">Save Advanced Settings</button></p>';
-        echo '</form></div>';
-    }
-
-    private function program_advanced_settings_module($agenda, $speaker_card, $event_page_settings, $speaker_page_settings) {
+        $event_settings = $this->settings_for_program($id, 'event');
+        $speaker_settings = $this->settings_for_program($id, 'speaker');
+        $categories = get_post_meta($id, '_pa_categories', true);
+        $all_same = get_post_meta($id, '_pa_categories_all_same', true) === '1';
         if (!is_array($agenda)) { $agenda = []; }
         if (!is_array($speaker_card)) { $speaker_card = []; }
-        if (!is_array($event_page_settings)) { $event_page_settings = []; }
-        if (!is_array($speaker_page_settings)) { $speaker_page_settings = []; }
-        echo '<div class="pa-program-preview-stage" data-pa-active-preview="agenda">';
-        echo '<div class="pa-program-preview-panel is-active" data-pa-preview-panel="agenda">';
-        $this->combined_program_preview($agenda, $speaker_card);
-        echo '</div><div class="pa-program-preview-panel" data-pa-preview-panel="event" hidden aria-hidden="true">';
-        $this->program_page_preview('event', $event_page_settings);
-        echo '</div><div class="pa-program-preview-panel" data-pa-preview-panel="speaker" hidden aria-hidden="true">';
-        $this->program_page_preview('speaker', $speaker_page_settings);
-        echo '</div></div>';
-        echo '<div class="pa-program-advanced-accordion pa-program-advanced-tabset" data-pa-active-section="agenda">';
-        echo '<nav class="pa-program-advanced-tab-buttons" aria-label="Program advanced settings"><button type="button" class="pa-program-advanced-tab-button is-active" data-pa-preview-target="agenda" aria-selected="true"><span>Agenda Settings</span><small>Public agenda and speaker cards.</small></button><button type="button" class="pa-program-advanced-tab-button" data-pa-preview-target="event" aria-selected="false"><span>Event Page Settings</span><small>Individual Event page styling for this program.</small></button><button type="button" class="pa-program-advanced-tab-button" data-pa-preview-target="speaker" aria-selected="false"><span>Speaker Page Settings</span><small>Individual Speaker page styling for this program.</small></button></nav>';
-        echo '<div class="pa-program-advanced-tab-panels">';
-        echo '<section class="pa-program-advanced-subsection pa-program-advanced-accordion-item is-active" data-pa-preview-target="agenda"><div class="pa-program-advanced-subsection-inner">';
-        echo '<div class="pa-program-advanced-panels">';
-        $this->agenda_controls($agenda);
-        $this->speaker_card_controls($speaker_card);
-        echo '</div></div></section>';
-        echo '<section class="pa-program-advanced-subsection pa-program-advanced-accordion-item" data-pa-preview-target="event"><div class="pa-program-advanced-subsection-inner" hidden>';
-        $this->program_page_settings_controls('event', $event_page_settings, 'event_page_settings');
-        echo '</div></section>';
-        echo '<section class="pa-program-advanced-subsection pa-program-advanced-accordion-item" data-pa-preview-target="speaker"><div class="pa-program-advanced-subsection-inner" hidden>';
-        $this->program_page_settings_controls('speaker', $speaker_page_settings, 'speaker_page_settings');
-        echo '</div></section>';
-        echo '</div></div><p class="pa-reset-advanced-wrap"><a href="#" class="pa-reset-all-advanced">Reset all advanced settings to default</a></p>';
-    }
-
-    public function form_program() {
-        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
-        $post = $id ? get_post($id) : null;
-        $title = $post ? $post->post_title : '';
-        $dates = $id ? get_post_meta($id, '_pa_program_dates', true) : '';
-        $start_date = $id ? get_post_meta($id, '_pa_program_start_date', true) : '';
-        $end_date = $id ? get_post_meta($id, '_pa_program_end_date', true) : '';
-        $back_to_link = $id ? get_post_meta($id, '_pa_back_to_link', true) : '';
-        $additional_dates = $id ? get_post_meta($id, '_pa_program_additional_dates', true) : [];
-        if (!is_array($additional_dates)) { $additional_dates = []; }
-        $show_desc = $id ? get_post_meta($id, '_pa_show_event_descriptions', true) : 'show';
-        $categories = $id ? get_post_meta($id, '_pa_categories', true) : [];
-        $all_categories_same = $id ? get_post_meta($id, '_pa_categories_all_same', true) : '';
         if (!is_array($categories)) { $categories = []; }
-        $speaker_categories = $id ? get_post_meta($id, '_pa_speaker_categories', true) : [];
-        if (!is_array($speaker_categories)) { $speaker_categories = []; }
-        $speaker_card = $id ? get_post_meta($id, '_pa_speaker_card_settings', true) : [];
-        if (!is_array($speaker_card)) { $speaker_card = []; }
-        $agenda = $id ? get_post_meta($id, '_pa_agenda_settings', true) : [];
-        if (!is_array($agenda)) { $agenda = []; }
-        if (!$agenda && $show_desc) { $agenda['show_descriptions'] = $show_desc; }
-        $this->nav('programs', $id && $title ? $title : '');
-        if (!empty($_GET['saved'])) { echo '<div class="notice notice-success is-dismissible pa-save-notice"><p>Saved successfully!</p></div>'; }
-        echo '<h2>' . ($id ? 'Edit Program' : 'Add New Program') . '</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-form pa-comfortable-form pa-program-form">';
-        wp_nonce_field('pa_save_program');
-        echo '<input type="hidden" name="action" value="pa_save_program"><input type="hidden" name="id" value="' . esc_attr($id) . '"><input type="hidden" name="pa_post_status" value="publish" class="pa-post-status">';
-        $this->program_style_copy_control($id);
-        $event_page_settings = $id ? get_post_meta($id, self::META_EVENT_SETTINGS, true) : [];
-        $speaker_page_settings = $id ? get_post_meta($id, self::META_SPEAKER_SETTINGS, true) : [];
-        echo '<input type="hidden" class="pa-copy-event-page-settings" name="program_event_page_settings_json" value="' . esc_attr(is_array($event_page_settings) ? wp_json_encode($event_page_settings) : '') . '">';
-        echo '<input type="hidden" class="pa-copy-speaker-page-settings" name="program_speaker_page_settings_json" value="' . esc_attr(is_array($speaker_page_settings) ? wp_json_encode($speaker_page_settings) : '') . '">';
-        echo '<label class="pa-field">Program title <span>*</span><input required type="text" name="program_title" value="' . esc_attr($title) . '"></label>';
-        echo '<div class="pa-inline-fields pa-two-fields pa-program-date-row"><label class="pa-field">Program start date<input type="date" name="program_start_date" value="' . esc_attr($start_date) . '"></label>';
-        echo '<label class="pa-field">Program end date<input type="date" name="program_end_date" value="' . esc_attr($end_date) . '"></label></div>';
-        echo '<div class="pa-additional-dates-block"><a href="#" class="pa-additional-dates-toggle">Additional Event Dates</a><div id="pa-additional-dates" class="pa-additional-dates-list">';
-        foreach ($additional_dates as $i => $range) { $this->additional_date_row($i, $range); }
-        echo '</div><template id="pa-additional-date-template">'; $this->additional_date_row('__INDEX__', ['start'=>'','end'=>'']); echo '</template></div>';
-        echo '<label class="pa-field">Back to link <span>*</span><input required type="url" name="back_to_link" value="' . esc_attr($back_to_link) . '" placeholder="https://example.com/program"><small>This is where the “Back to Program” link on individual Event and Speaker pages will send users.</small></label>';
-        echo '<section class="pa-program-category-columns"><div class="pa-program-category-column pa-event-categories-column"><h3>Event Categories</h3><p class="description">Category colors and icons are intentional design settings. If no color is chosen, black is used.</p>';
-        echo '<label class="pa-field pa-checkbox-field pa-all-categories-same-field"><input type="checkbox" name="categories_all_same" value="1" class="pa-all-categories-same" ' . checked($all_categories_same, '1', false) . '> All event categories have same settings</label>';
-        echo '<div id="pa-categories">';
-        if (!$categories) { $categories = [['name'=>'','color'=>'#000000','icon'=>'none']]; }
-        foreach ($categories as $i => $cat) { $this->category_row($i, $cat); }
-        echo '</div><button type="button" class="button pa-add-category">Add event category</button>';
-        echo '<template id="pa-category-template">'; $this->category_row('__INDEX__', ['name'=>'','color'=>'#000000','icon'=>'none']); echo '</template></div>';
-        echo '<div class="pa-program-category-column pa-speaker-categories-column"><h3>Speaker Categories</h3><p class="description">Optional labels such as Moderator, Host, Panelist, or Featured Speaker. These appear above selected speaker cards.</p><div id="pa-speaker-categories">';
-        if (!$speaker_categories) { $speaker_categories = [['name'=>'']]; }
-        foreach ($speaker_categories as $i => $speaker_category) { $this->speaker_category_row($i, $speaker_category); }
-        echo '</div><button type="button" class="button pa-add-speaker-category">Add speaker category</button>';
-        echo '<template id="pa-speaker-category-template">'; $this->speaker_category_row('__INDEX__', ['name'=>'']); echo '</template></div></section>';
-        $sponsor_levels = $id ? get_post_meta($id, '_pa_sponsor_levels', true) : [];
-        $primary_sponsor_level = $id ? get_post_meta($id, '_pa_primary_sponsor_level', true) : '';
-        if (!is_array($sponsor_levels)) { $sponsor_levels = []; }
-        echo '<section class="pa-sponsor-levels-section"><h3>Sponsor Levels</h3><p class="description">Add sponsor levels for this Program. Sponsors can be assigned to one or more levels. Drag, or use the arrows, to reorder how levels appear on sponsor showcase pages.</p><div id="pa-sponsor-levels">';
-        if (!$sponsor_levels) { $sponsor_levels = ['']; }
-        foreach ($sponsor_levels as $i => $level) { $this->sponsor_level_row($i, $level); }
-        echo '</div><button type="button" class="button pa-add-sponsor-level">Add sponsor level</button><template id="pa-sponsor-level-template">'; $this->sponsor_level_row('__INDEX__', ''); echo '</template></section>';
-        echo '<label class="pa-field pa-primary-sponsor-level-field">Primary Sponsor Level';
-echo '<select name="primary_sponsor_level">';
-echo '<option value="">None</option>';
 
-foreach ($sponsor_levels as $level) {
-    if ($level === '') { continue; }
-    echo '<option value="' . esc_attr($level) . '" ' . selected($primary_sponsor_level, $level, false) . '>' . esc_html($level) . '</option>';
-}
+        echo '<section class="pa-form-card pa-advanced-settings-card"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-form pa-advanced-settings-form">';
+        wp_nonce_field('pa_save_program_advanced');
+        echo '<input type="hidden" name="action" value="pa_save_program_advanced"><input type="hidden" name="program_id" value="' . esc_attr($id) . '">';
 
-echo '</select>';
-echo '<small>The selected sponsor level will display larger, two logos across.</small>';
-echo '</label>';
-        echo '<details class="pa-program-advanced-settings"><summary><span>Advanced Settings</span><small>Adjust how the public agenda, speaker cards, and individual Event/Speaker pages appear for this program.</small><small>Leave fields blank to inherit the active WordPress theme. Border width and radius default to 0.</small></summary><div class="pa-program-advanced-inner">';
-        $this->program_advanced_settings_module($agenda, $speaker_card, $event_page_settings, $speaker_page_settings);
-        echo '</div></details>';
-        if ($id) {
-            echo '<div class="pa-shortcode-box"><h3>Agenda Shortcode</h3><p>Place this shortcode on any page where the schedule should appear.</p><input readonly value="' . esc_attr('[program_agenda id="' . $this->program_shortcode_id($id) . '"]') . '" onclick="this.select();"></div>';
-            echo '<div class="pa-shortcode-box"><h3>Sponsor Showcase Shortcode</h3><p>Place this shortcode on the public Sponsors showcase page.</p><input readonly value="' . esc_attr('[program_sponsors id="' . $this->program_shortcode_id($id) . '"]') . '" onclick="this.select();"></div>';
-            echo '<div class="pa-shortcode-box"><h3>Speaker Directory Shortcode</h3><p>Place this shortcode on a public Speakers page to show everyone speaking at this Program.</p><input readonly value="' . esc_attr('[program_speakers id="' . $this->program_shortcode_id($id) . '"]') . '" onclick="this.select();"></div>';
-            echo '<div class="pa-shortcode-box"><h3>Program PDF Shortcode</h3><p>Place this shortcode wherever users should download or print the latest Program agenda.</p><input readonly value="' . esc_attr('[program_pdf id="' . $this->program_shortcode_id($id) . '"]') . '" onclick="this.select();"></div>';
-        } else {
-            echo '<div class="pa-shortcode-box"><h3>Shortcodes</h3><p>The agenda, sponsor showcase, speaker directory, and Program PDF shortcodes will appear here after the program is saved.</p></div>';
-        }
-        echo $this->form_actions('Save Program') . '</form></div>';
-    }
+        echo '<div class="pa-advanced-grid">';
+        echo '<section class="pa-advanced-panel"><h3>Agenda Display</h3>';
+        echo '<label class="pa-field">Event card style<select name="agenda[card_size]"><option value="full" ' . selected($agenda['card_size'] ?? 'full', 'full', false) . '>Full cards with speakers</option><option value="thin" ' . selected($agenda['card_size'] ?? '', 'thin', false) . '>Thin cards without speakers</option></select></label>';
+        echo '<label class="pa-field">Event descriptions<select name="agenda[show_descriptions]"><option value="show" ' . selected($agenda['show_descriptions'] ?? '', 'show', false) . '>Show on agenda</option><option value="hide" ' . selected($agenda['show_descriptions'] ?? 'hide', 'hide', false) . '>Hide on agenda</option></select></label>';
+        echo '<label class="pa-field">Agenda date display<select name="agenda[date_display]"><option value="numeric" ' . selected($agenda['date_display'] ?? 'numeric', 'numeric', false) . '>Numeric day</option><option value="abbrev" ' . selected($agenda['date_display'] ?? '', 'abbrev', false) . '>Abbreviated month + day</option></select></label>';
+        echo '<label class="pa-field">Date navigation<select name="agenda[display_mode]"><option value="tabs" ' . selected($agenda['display_mode'] ?? 'tabs', 'tabs', false) . '>Tabs</option><option value="stacked" ' . selected($agenda['display_mode'] ?? '', 'stacked', false) . '>Stacked by day</option></select></label>';
+        echo '</section>';
 
-    private function program_style_copy_control($current_id = 0) {
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC','exclude'=>[$current_id]]);
-        if (!$programs) { return; }
-        echo '<section class="pa-copy-styles-box"><h3>Copy styles from previous program</h3><p class="description">Copies category colors/icons, agenda settings, speaker card settings, and program-specific Event/Speaker page settings. Program title, dates, and content stay unchanged.</p>';
-        echo '<div class="pa-copy-styles-row"><select class="pa-copy-program-source"><option value="">Select a program</option>';
-        foreach ($programs as $program) {
-            $cats = get_post_meta($program->ID, '_pa_categories', true);
-            if (!is_array($cats)) { $cats = []; }
-            $card = get_post_meta($program->ID, '_pa_speaker_card_settings', true);
-            if (!is_array($card)) { $card = []; }
-            $agenda = get_post_meta($program->ID, '_pa_agenda_settings', true);
-            if (!is_array($agenda)) { $agenda = []; }
-            $event_page = get_post_meta($program->ID, self::META_EVENT_SETTINGS, true);
-            if (!is_array($event_page)) { $event_page = []; }
-            $speaker_page = get_post_meta($program->ID, self::META_SPEAKER_SETTINGS, true);
-            if (!is_array($speaker_page)) { $speaker_page = []; }
-            $styles = ['categories' => $cats, 'speaker_card' => $card, 'agenda' => $agenda, 'event_page' => $event_page, 'speaker_page' => $speaker_page];
-            echo '<option value="' . esc_attr($program->ID) . '" data-styles="' . esc_attr(wp_json_encode($styles)) . '">' . esc_html($program->post_title) . '</option>';
-        }
-        echo '</select> <button type="button" class="button pa-copy-program-styles">Copy all styles</button></div></section>';
-    }
-
-    private function additional_date_row($i, $range) {
-        $start = is_array($range) ? ($range['start'] ?? '') : '';
-        $end = is_array($range) ? ($range['end'] ?? '') : '';
-        echo '<div class="pa-additional-date-row pa-inline-fields pa-two-fields">';
-        echo '<label class="pa-field">Additional start date<input type="date" name="additional_dates[' . esc_attr($i) . '][start]" value="' . esc_attr($start) . '"></label>';
-        echo '<label class="pa-field">Additional end date<input type="date" name="additional_dates[' . esc_attr($i) . '][end]" value="' . esc_attr($end) . '"><a href="#" class="pa-remove-additional-date">Remove date range</a></label>';
+        echo '<section class="pa-advanced-panel"><h3>Agenda Colors</h3><div class="pa-color-setting-row">';
+        echo $this->color_control('agenda[background]', $agenda['background'] ?? '', '', 'Background color', 'Agenda background color');
+        echo $this->color_control('agenda[accent_bar_color]', $agenda['accent_bar_color'] ?? '', '', 'Accent bar color', 'Event card accent bar color');
+        echo $this->color_control('agenda[title_color]', $agenda['title_color'] ?? '', '', 'Event title color', 'Event title color');
+        echo $this->color_control('agenda[location_color]', $agenda['location_color'] ?? '', '', 'Event details color', 'Event details color');
         echo '</div>';
-    }
-
-    private function category_row($i, $cat) {
-        $icons = ['none'=>'None','heart'=>'Heart','circle'=>'Circle','triangle'=>'Triangle','square'=>'Square','star'=>'Star'];
-        $selected_icon = $cat['icon'] ?? 'none';
-        echo '<div class="pa-category-row">';
-        echo '<input type="text" name="categories[' . esc_attr($i) . '][name]" placeholder="Category name" value="' . esc_attr($cat['name'] ?? '') . '">';
-        echo $this->color_control('categories[' . esc_attr($i) . '][color]', $cat['color'] ?? '#000000', '', '', 'Category color');
-        echo '<span class="pa-category-icon-preview" aria-label="Icon preview">' . esc_html($this->icon_char($selected_icon)) . '</span>';
-        echo '<select class="pa-category-icon-select" name="categories[' . esc_attr($i) . '][icon]">';
-        foreach ($icons as $key => $label) { echo '<option value="' . esc_attr($key) . '" ' . selected($selected_icon, $key, false) . '>' . esc_html($label) . '</option>'; }
-        echo '</select>';
-        echo '<a href="#" class="pa-remove-row pa-remove-category-link">Remove category</a>';
-        echo '<div class="pa-category-remove-warning" hidden><p>This will remove this category from all events that use it.</p><label><input type="checkbox" class="pa-hide-category-warning"> Don&rsquo;t show this warning again</label><button type="button" class="button button-link-delete pa-confirm-remove-category">Remove</button></div>';
+        echo '<div class="pa-color-setting-row">';
+        echo $this->color_control('agenda[tab_background_color]', $agenda['tab_background_color'] ?? '', '', 'Tab background color', 'Date tab background color');
+        echo $this->color_control('agenda[tab_border_color]', $agenda['tab_border_color'] ?? '', '', 'Tab border color', 'Date tab border color');
+        echo $this->color_control('agenda[border_color]', $agenda['border_color'] ?? '', '', 'Card border color', 'Event card border color');
         echo '</div>';
-    }
+        $this->border_group_named('agenda', 'tab_border', 'Date tab border', $agenda);
+        $this->border_group_named('agenda', 'border', 'Event card border', $agenda);
+        echo '</section>';
 
-    private function speaker_category_row($i, $category) {
-        $name = is_array($category) ? ($category['name'] ?? '') : (string)$category;
-        echo '<div class="pa-speaker-category-row"><input type="text" name="speaker_categories[' . esc_attr($i) . '][name]" placeholder="Speaker category" value="' . esc_attr($name) . '"><a href="#" class="pa-remove-row pa-remove-speaker-category-link">Remove category</a></div>';
-    }
-
-    private function normalize_speaker_categories($categories) {
-        $normalized = [];
-        foreach ((array)$categories as $category) {
-            $name = is_array($category) ? ($category['name'] ?? '') : $category;
-            $name = sanitize_text_field($name);
-            if ($name !== '' && !in_array($name, $normalized, true)) { $normalized[] = $name; }
-        }
-        return $normalized;
-    }
-
-    private function speaker_categories_for_program($program_id = 0) {
-        $program_id = absint($program_id);
-        if ($program_id) { return $this->normalize_speaker_categories(get_post_meta($program_id, '_pa_speaker_categories', true)); }
-        $categories = [];
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC']);
-        foreach ($programs as $program) {
-            foreach ($this->normalize_speaker_categories(get_post_meta($program->ID, '_pa_speaker_categories', true)) as $category) {
-                if (!in_array($category, $categories, true)) { $categories[] = $category; }
-            }
-        }
-        return $categories;
-    }
-
-    private function speaker_category_options_html($categories, $selected = '') {
-        $selected = sanitize_text_field($selected);
-        ob_start();
-        echo '<option value="">Default speaker</option>';
-        foreach ($this->normalize_speaker_categories($categories) as $category) {
-            echo '<option value="' . esc_attr($category) . '" ' . selected($selected, $category, false) . '>' . esc_html($category) . '</option>';
-        }
-        return ob_get_clean();
-    }
-
-    private function selected_speaker_admin_row($speaker_id, $event_speaker_categories = [], $speaker_categories = []) {
-        $speaker_id = absint($speaker_id);
-        $sp = get_post($speaker_id);
-        if (!$sp || $sp->post_type !== 'pa_speaker') { return ''; }
-        $selected_category = '';
-        foreach ([$speaker_id, (string)$speaker_id] as $key) {
-            if (isset($event_speaker_categories[$key])) { $selected_category = sanitize_text_field($event_speaker_categories[$key]); break; }
-        }
-        return '<li data-id="' . esc_attr($speaker_id) . '"><span class="pa-selected-speaker-name">' . esc_html($sp->post_title) . '</span><span class="pa-selected-speaker-category-wrap"><label><span class="screen-reader-text">Speaker category</span><select class="pa-selected-speaker-category" name="speaker_categories[' . esc_attr($speaker_id) . ']">' . $this->speaker_category_options_html($speaker_categories, $selected_category) . '</select></label></span><span class="pa-selected-speaker-actions"><button type="button" class="button-link pa-move-speaker-up" aria-label="Move up" title="Move up"><span aria-hidden="true">▲</span><span class="screen-reader-text">Move up</span></button> <button type="button" class="button-link pa-move-speaker-down" aria-label="Move down" title="Move down"><span aria-hidden="true">▼</span><span class="screen-reader-text">Move down</span></button> <button type="button" class="button-link pa-remove-speaker">Remove</button></span></li>';
-    }
-
-    private function sponsor_level_row($i, $level) {
-        echo '<div class="pa-sponsor-level-row">';
-        echo '<span class="pa-sponsor-level-handle" aria-hidden="true">☰</span>';
-        echo '<input type="text" name="sponsor_levels[' . esc_attr($i) . ']" placeholder="Sponsor level" value="' . esc_attr($level) . '">';
-        echo '<span class="pa-sponsor-level-actions"><button type="button" class="button-link pa-move-sponsor-level-up" aria-label="Move up" title="Move up"><span aria-hidden="true">▲</span><span class="screen-reader-text">Move up</span></button> <button type="button" class="button-link pa-move-sponsor-level-down" aria-label="Move down" title="Move down"><span aria-hidden="true">▼</span><span class="screen-reader-text">Move down</span></button> <a href="#" class="pa-remove-sponsor-level">Remove level</a></span>';
+        echo '<section class="pa-advanced-panel"><h3>Speaker Cards</h3>';
+        echo '<label class="pa-checkbox-field"><input type="checkbox" name="speaker_card[show_thumbnail]" value="1" ' . checked(!empty($speaker_card['show_thumbnail']), true, false) . '> Show speaker thumbnails on agenda cards</label>';
+        echo '<label class="pa-field">Thumbnail shape<select name="speaker_card[thumbnail_shape]"><option value="theme" ' . selected($speaker_card['thumbnail_shape'] ?? 'theme', 'theme', false) . '>Theme/default</option><option value="circle" ' . selected($speaker_card['thumbnail_shape'] ?? '', 'circle', false) . '>Circle</option><option value="square" ' . selected($speaker_card['thumbnail_shape'] ?? '', 'square', false) . '>Square</option></select></label>';
+        echo '<div class="pa-color-setting-row">';
+        echo $this->color_control('speaker_card[background]', $speaker_card['background'] ?? '', '', 'Background color', 'Speaker card background color');
+        echo $this->color_control('speaker_card[color]', $speaker_card['color'] ?? '', '', 'Text color', 'Speaker card text color');
+        echo $this->color_control('speaker_card[border_color]', $speaker_card['border_color'] ?? '', '', 'Border color', 'Speaker card border color');
         echo '</div>';
+        $this->border_group_named('speaker_card', 'border', 'Speaker card border', $speaker_card);
+        echo '</section>';
+
+        echo '<section class="pa-advanced-panel pa-advanced-panel-wide"><h3>Categories</h3>';
+        echo '<label class="pa-checkbox-field"><input type="checkbox" name="categories_all_same" value="1" ' . checked($all_same, true, false) . '> Use one shared color and icon for all categories</label>';
+        $this->category_repeater($categories);
+        echo '</section>';
+
+        echo '<section class="pa-advanced-panel pa-advanced-panel-wide"><h3>Event Page Settings</h3>';
+        $this->program_page_settings_controls('event', $event_settings, 'event_page_settings');
+        echo '</section>';
+
+        echo '<section class="pa-advanced-panel pa-advanced-panel-wide"><h3>Speaker Page Settings</h3>';
+        $this->program_page_settings_controls('speaker', $speaker_settings, 'speaker_page_settings');
+        echo '</section>';
+        echo '</div>';
+
+        echo '<p><button class="button button-primary">Save Advanced Settings</button></p>';
+        echo '</form></section></div>';
     }
 
-    private function program_border_controls($group, $s, $label, $live_class = '') {
-        $live_class = trim($live_class);
-        $lock_radius = !empty($s['lock_radius']);
-        $lock_width = !empty($s['lock_width']);
-        $radius_fallback = isset($s['border_radius']) && $s['border_radius'] !== '' ? absint($s['border_radius']) : 0;
-        $width_fallback = isset($s['border_width']) && $s['border_width'] !== '' ? absint($s['border_width']) : 0;
-        echo '<details class="pa-program-border-control pa-border-control pa-collapsible-border" data-border-key="' . esc_attr($group) . '">';
-        echo '<summary><span>' . esc_html($label) . '</span><small>Corner radius, border width, and sides</small></summary>';
-        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Corner radius</strong><label><input class="pa-lock-radius ' . esc_attr($live_class) . '" type="checkbox" name="' . esc_attr($group) . '[lock_radius]" value="1" ' . checked($lock_radius, true, false) . '> Same for every corner</label></div>';
-        echo '<div class="pa-border-grid pa-radius-fields">';
-        foreach (['tl'=>'Top left','tr'=>'Top right','br'=>'Bottom right','bl'=>'Bottom left'] as $k=>$lab) {
-            $val = $s['radius_' . $k] ?? $radius_fallback;
-            echo '<label>' . esc_html($lab) . '<input class="pa-radius-input ' . esc_attr($live_class) . '" type="number" min="0" name="' . esc_attr($group) . '[radius_' . esc_attr($k) . ']" value="' . esc_attr($val) . '" placeholder="0"></label>';
+    public function save_program_advanced() {
+        check_admin_referer('pa_save_program_advanced');
+        $program_id = absint($_POST['program_id'] ?? 0);
+        $this->require_edit_pa_post('pa_program', $program_id);
+
+        $agenda_in = (array)($_POST['agenda'] ?? []);
+        $agenda = [
+            'show_descriptions' => sanitize_key($agenda_in['show_descriptions'] ?? 'hide') === 'show' ? 'show' : 'hide',
+            'display_mode' => sanitize_key($agenda_in['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs',
+            'speaker_layout' => 'inline',
+            'date_display' => in_array(sanitize_key($agenda_in['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? sanitize_key($agenda_in['date_display'] ?? 'numeric') : 'numeric',
+            'card_size' => $this->normalize_agenda_card_size($agenda_in['card_size'] ?? 'full'),
+            'background' => sanitize_hex_color($agenda_in['background'] ?? '') ?: '',
+            'accent_bar_color' => sanitize_hex_color($agenda_in['accent_bar_color'] ?? '') ?: '',
+            'title_color' => sanitize_hex_color($agenda_in['title_color'] ?? ($agenda_in['color'] ?? '')) ?: '',
+            'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
+            'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
+            'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
+            'tab_border' => $this->sanitize_tab_border_options($agenda_in['tab_border'] ?? []),
+            'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
+        ];
+        $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
+        update_post_meta($program_id, '_pa_agenda_settings', $agenda);
+        update_post_meta($program_id, '_pa_show_event_descriptions', $agenda['show_descriptions']);
+
+        $categories_all_same = !empty($_POST['categories_all_same']) ? '1' : '0';
+        update_post_meta($program_id, '_pa_categories_all_same', $categories_all_same);
+        $cats = [];
+        foreach ((array)($_POST['categories'] ?? []) as $cat) {
+            $name = sanitize_text_field($cat['name'] ?? '');
+            if ($name === '') { continue; }
+            $cats[] = ['name'=>$name, 'color'=>sanitize_hex_color($cat['color'] ?? '') ?: '#000000', 'icon'=>sanitize_key($cat['icon'] ?? 'none')];
         }
-        echo '</div></div>';
-        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Border width</strong><label><input class="pa-lock-width ' . esc_attr($live_class) . '" type="checkbox" name="' . esc_attr($group) . '[lock_width]" value="1" ' . checked($lock_width, true, false) . '> Same for every side</label></div>';
-        echo '<div class="pa-border-grid pa-width-fields">';
-        foreach (['top'=>'Top','right'=>'Right','bottom'=>'Bottom','left'=>'Left'] as $k=>$lab) {
-            $val = $s['width_' . $k] ?? $width_fallback;
-            echo '<label>' . esc_html($lab) . '<input class="pa-width-input ' . esc_attr($live_class) . '" type="number" min="0" name="' . esc_attr($group) . '[width_' . esc_attr($k) . ']" value="' . esc_attr($val) . '" placeholder="0"></label>';
+        if ($categories_all_same === '1' && $cats) {
+            $shared_color = $cats[0]['color'] ?: '#000000';
+            $shared_icon = $cats[0]['icon'] ?: 'none';
+            foreach ($cats as &$cat) { $cat['color'] = $shared_color; $cat['icon'] = $shared_icon; }
+            unset($cat);
         }
-        echo '</div></div>';
-        echo '<div class="pa-border-section pa-border-color-section">';
-        echo $this->color_control($group . '[border_color]', $s['border_color'] ?? '', '', 'Border color', $label . ' border color');
-        echo '</div></details>';
+        update_post_meta($program_id, '_pa_categories', $cats);
+
+        $card_in = (array)($_POST['speaker_card'] ?? []);
+        $card = [
+            'show_thumbnail' => !empty($card_in['show_thumbnail']) ? '1' : '0',
+            'thumbnail_shape' => sanitize_key($card_in['thumbnail_shape'] ?? 'theme'),
+            'background' => sanitize_hex_color($card_in['background'] ?? '') ?: '',
+            'color' => sanitize_hex_color($card_in['color'] ?? '') ?: '',
+            'border_color' => sanitize_hex_color($card_in['border_color'] ?? '') ?: '',
+        ];
+        $card = array_merge($card, $this->sanitize_program_border_options($card_in));
+        update_post_meta($program_id, '_pa_speaker_card_settings', $card);
+
+        update_post_meta($program_id, self::META_EVENT_SETTINGS, $this->sanitize_settings($_POST['event_page_settings'] ?? []));
+        update_post_meta($program_id, self::META_SPEAKER_SETTINGS, $this->sanitize_settings($_POST['speaker_page_settings'] ?? []));
+
+        wp_safe_redirect(admin_url('admin.php?page=program-advanced-settings&id=' . $program_id . '&saved=1'));
+        exit;
+    }
+
+    private function normalize_agenda_card_size($value) {
+        $value = sanitize_key($value);
+        return in_array($value, ['thin','full'], true) ? $value : 'full';
     }
 
     private function sanitize_tab_border_options($input) {
-        $input = is_array($input) ? $input : [];
-        $out = [
-            'lock_radius' => !empty($input['lock_radius']) ? '1' : '',
-            'lock_width' => !empty($input['lock_width']) ? '1' : '',
-        ];
-        foreach (['tl','tr','br','bl'] as $corner) {
-            $key = 'radius_' . $corner;
-            $out[$key] = isset($input[$key]) && $input[$key] !== '' ? absint($input[$key]) : 999;
+        if (!is_array($input)) { $input = []; }
+        $out = [];
+        $out['color'] = sanitize_hex_color($input['color'] ?? '') ?: '';
+        $out['lock_radius'] = !empty($input['lock_radius']) ? '1' : '0';
+        $out['lock_width'] = !empty($input['lock_width']) ? '1' : '0';
+        foreach (['tl','tr','br','bl'] as $key) {
+            $out['radius_' . $key] = max(0, intval($input['radius_' . $key] ?? 0));
         }
-        foreach (['top','right','bottom','left'] as $side) {
-            $key = 'width_' . $side;
-            $out[$key] = isset($input[$key]) && $input[$key] !== '' ? absint($input[$key]) : 1;
-        }
-        if (!empty($out['lock_radius'])) {
-            $shared_radius = $out['radius_tl'];
-            foreach (['tr','br','bl'] as $corner) { $out['radius_' . $corner] = $shared_radius; }
-        }
-        if (!empty($out['lock_width'])) {
-            $shared_width = $out['width_top'];
-            foreach (['right','bottom','left'] as $side) { $out['width_' . $side] = $shared_width; }
+        foreach (['top','right','bottom','left'] as $key) {
+            $out['width_' . $key] = max(0, intval($input['width_' . $key] ?? 0));
         }
         return $out;
     }
 
-    private function sanitize_program_border_options($raw) {
-        $raw = (array)$raw;
-        $out = [
-            'lock_radius' => !empty($raw['lock_radius']) ? 1 : 0,
-            'lock_width' => !empty($raw['lock_width']) ? 1 : 0,
+    private function sanitize_program_border_options($input) {
+        if (!is_array($input)) { $input = []; }
+        $border = isset($input['border']) && is_array($input['border']) ? $input['border'] : [];
+        $out = [];
+        $out['border_width'] = max(0, intval($border['width_top'] ?? ($input['border_width'] ?? 0)));
+        $out['border_radius'] = max(0, intval($border['radius_tl'] ?? ($input['border_radius'] ?? 0)));
+        $out['border'] = [
+            'color' => sanitize_hex_color($border['color'] ?? ($input['border_color'] ?? '')) ?: '',
+            'lock_radius' => !empty($border['lock_radius']) ? '1' : '0',
+            'lock_width' => !empty($border['lock_width']) ? '1' : '0',
         ];
-        $radius_fallback = isset($raw['border_radius']) && $raw['border_radius'] !== '' ? absint($raw['border_radius']) : 0;
-        $width_fallback = isset($raw['border_width']) && $raw['border_width'] !== '' ? absint($raw['border_width']) : 0;
-        $radius_values = [];
-        foreach (['tl','tr','br','bl'] as $k) { $radius_values[$k] = isset($raw['radius_' . $k]) && $raw['radius_' . $k] !== '' ? absint($raw['radius_' . $k]) : $radius_fallback; }
-        if ($out['lock_radius']) { $first = reset($radius_values); foreach ($radius_values as $k=>$v) { $radius_values[$k] = $first; } }
-        foreach ($radius_values as $k=>$v) { $out['radius_' . $k] = $v; }
-        $width_values = [];
-        foreach (['top','right','bottom','left'] as $k) { $width_values[$k] = isset($raw['width_' . $k]) && $raw['width_' . $k] !== '' ? absint($raw['width_' . $k]) : $width_fallback; }
-        if ($out['lock_width']) { $first = reset($width_values); foreach ($width_values as $k=>$v) { $width_values[$k] = $first; } }
-        foreach ($width_values as $k=>$v) { $out['width_' . $k] = $v; }
+        foreach (['tl','tr','br','bl'] as $key) {
+            $out['border']['radius_' . $key] = max(0, intval($border['radius_' . $key] ?? $out['border_radius']));
+        }
+        foreach (['top','right','bottom','left'] as $key) {
+            $out['border']['width_' . $key] = max(0, intval($border['width_' . $key] ?? $out['border_width']));
+        }
         return $out;
     }
 
-    private function program_border_style($settings, $important = false) {
-        if (!is_array($settings)) { return ''; }
-        $bang = $important ? ' !important' : '';
-        $style = 'border-style:solid' . $bang . ';';
-        $has = false;
-        foreach (['top','right','bottom','left'] as $side) {
-            $v = isset($settings['width_' . $side]) ? $settings['width_' . $side] : ($settings['border_width'] ?? null);
-            if ($v !== null && $v !== '') { $style .= 'border-' . $side . '-width:' . absint($v) . 'px' . $bang . ';'; $has = true; }
+    private function category_repeater($categories) {
+        $categories = is_array($categories) && $categories ? $categories : [['name'=>'','color'=>'#000000','icon'=>'none']];
+        echo '<div class="pa-category-repeater">';
+        foreach ($categories as $i=>$cat) {
+            $name = $cat['name'] ?? ''; $color = $cat['color'] ?? '#000000'; $icon = $cat['icon'] ?? 'none';
+            echo '<div class="pa-category-row">';
+            echo '<label>Name<input type="text" name="categories['.$i.'][name]" value="' . esc_attr($name) . '"></label>';
+            echo '<label>Color<input type="text" class="pa-color" name="categories['.$i.'][color]" value="' . esc_attr($color) . '"></label>';
+            echo '<label>Icon<select name="categories['.$i.'][icon]">';
+            foreach ($this->category_icon_options() as $key=>$label) { echo '<option value="'.esc_attr($key).'" '.selected($icon,$key,false).'>'.esc_html($label).'</option>'; }
+            echo '</select></label><button type="button" class="button pa-remove-category">Remove</button></div>';
         }
-        foreach (['tl'=>'top-left','tr'=>'top-right','br'=>'bottom-right','bl'=>'bottom-left'] as $k=>$corner) {
-            $v = isset($settings['radius_' . $k]) ? $settings['radius_' . $k] : ($settings['border_radius'] ?? null);
-            if ($v !== null && $v !== '') { $style .= 'border-' . $corner . '-radius:' . absint($v) . 'px' . $bang . ';'; $has = true; }
+        echo '</div><button type="button" class="button pa-add-category">Add category</button>';
+    }
+
+    private function program_speaker_categories($program_id) {
+        $categories = get_post_meta($program_id, '_pa_speaker_categories', true);
+        if (!is_array($categories)) { $categories = []; }
+        return array_values(array_filter(array_map(static function($category) {
+            if (is_array($category)) { return sanitize_text_field($category['name'] ?? ''); }
+            return sanitize_text_field($category);
+        }, $categories)));
+    }
+
+    private function speaker_categories_for_program($program_id) {
+        return $program_id ? $this->program_speaker_categories($program_id) : [];
+    }
+
+    private function program_categories_for_js() {
+        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
+        $data = [];
+        foreach ($programs as $program) {
+            $cats = get_post_meta($program->ID, '_pa_categories', true);
+            if (!is_array($cats)) { $cats = []; }
+            $data[$program->ID] = array_values(array_filter(array_map(static function($cat) {
+                return is_array($cat) ? sanitize_text_field($cat['name'] ?? '') : sanitize_text_field($cat);
+            }, $cats)));
         }
-        return $has ? $style : '';
+        return $data;
     }
 
-
-    /**
-     * Keep stale saved test values (for example medium/large) on the safe full-card path.
-     */
-    private function normalize_agenda_card_size($value) {
-        $value = sanitize_key((string)$value);
-        return $value === 'thin' ? 'thin' : 'full';
+    private function program_dates_for_js() {
+        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
+        $data = [];
+        foreach ($programs as $program) {
+            $dates = $this->program_date_options($program->ID);
+            $data[$program->ID] = $dates;
+        }
+        return $data;
     }
 
-    private function agenda_controls($s) {
-        $show_desc = $s['show_descriptions'] ?? 'hide';
-        $display_mode = ($s['display_mode'] ?? 'tabs') === 'tabs' ? 'tabs' : 'stacked';
-        $date_display = $s['date_display'] ?? 'numeric';
-        if (!in_array($date_display, ['numeric','abbrev'], true)) { $date_display = 'numeric'; }
-        $card_size = $this->normalize_agenda_card_size($s['card_size'] ?? 'full');
-
-        echo '<section class="pa-program-design-panel pa-agenda-section pa-event-card-section pa-advanced-tab-panel active" data-pa-program-panel="agenda"><h4>Event Card Settings</h4><p class="description">Controls how event cards appear on the public agenda.</p>';
-
-        echo '<div class="pa-agenda-options-row pa-agenda-color-row">';
-        echo $this->color_control('agenda[background]', $s['background'] ?? '', '', 'Background color', 'Agenda background color');
-        echo $this->color_control('agenda[accent_bar_color]', $s['accent_bar_color'] ?? '', '', 'Accent bar color', 'Event card accent bar color');
-        echo $this->color_control('agenda[title_color]', $s['title_color'] ?? ($s['color'] ?? ''), '', 'Title text color', 'Event title text color');
-        echo $this->color_control('agenda[location_color]', $s['location_color'] ?? '', '', 'Event information text color', 'Event information text color');
-        echo '</div>';
-
-        echo '<div class="pa-agenda-options-row pa-agenda-border-row">';
-        $this->program_border_controls('agenda', $s, 'Border', 'pa-agenda-live-field');
-        echo '</div>';
-
-        echo '<details class="pa-nested-advanced-settings"><summary><span>Advanced Settings</span><small>Display options, tabs, date format, and card size</small></summary>';
-        echo '<div class="pa-agenda-options-row pa-agenda-behavior-row">';
-        echo '<label class="pa-field">Event descriptions <span>*</span><select class="pa-agenda-live-field" required name="agenda[show_descriptions]"><option value="show" ' . selected($show_desc, 'show', false) . '>Show</option><option value="hide" ' . selected($show_desc, 'hide', false) . '>Hide</option></select></label>';
-        echo '<label class="pa-field">Agenda display <select class="pa-agenda-live-field" name="agenda[display_mode]"><option value="stacked" ' . selected($display_mode, 'stacked', false) . '>Stacked</option><option value="tabs" ' . selected($display_mode, 'tabs', false) . '>Tabs by day</option></select></label>';
-        echo '<input type="hidden" class="pa-agenda-live-field" name="agenda[speaker_layout]" value="inline">';
-        echo '<div class="pa-agenda-tab-color-row">';
-        echo $this->color_control('agenda[tab_background_color]', $s['tab_background_color'] ?? '', '', 'Tab color', 'Agenda tab color');
-        echo $this->color_control('agenda[tab_border_color]', $s['tab_border_color'] ?? '', '', 'Tab border color', 'Agenda tab border color');
-        echo '</div>';
-        $tab_border = isset($s['tab_border']) && is_array($s['tab_border']) ? $s['tab_border'] : [];
-        echo '<details class="pa-control-group pa-border-control pa-collapsible-border pa-tab-border-control" open>';
-        echo '<summary>Tab border <small>Radius, width, and color</small></summary>';
-        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Corner radius</strong><label><input class="pa-lock-radius" type="checkbox" name="agenda[tab_border][lock_radius]" value="1" ' . checked(!empty($tab_border['lock_radius']), true, false) . '> Same for every corner</label></div>';
-        echo '<div class="pa-border-grid pa-radius-fields">';
-        foreach (['tl'=>'Top left','tr'=>'Top right','br'=>'Bottom right','bl'=>'Bottom left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-radius-input pa-agenda-live-field" type="number" min="0" name="agenda[tab_border][radius_' . esc_attr($k) . ']" value="' . esc_attr($tab_border['radius_'.$k] ?? 999) . '" placeholder="999"></label>'; }
-        echo '</div></div>';
-        echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Border width</strong><label><input class="pa-lock-width" type="checkbox" name="agenda[tab_border][lock_width]" value="1" ' . checked(!empty($tab_border['lock_width']), true, false) . '> Same for every side</label></div>';
-        echo '<div class="pa-border-grid pa-width-fields">';
-        foreach (['top'=>'Top','right'=>'Right','bottom'=>'Bottom','left'=>'Left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-width-input pa-agenda-live-field" type="number" min="0" name="agenda[tab_border][width_' . esc_attr($k) . ']" value="' . esc_attr($tab_border['width_'.$k] ?? 1) . '" placeholder="1"></label>'; }
-        echo '</div></div>';
-        echo '</details>';
-        echo '<label class="pa-field">Date display <select class="pa-agenda-live-field" name="agenda[date_display]"><option value="numeric" ' . selected($date_display, 'numeric', false) . '>8/20</option><option value="abbrev" ' . selected($date_display, 'abbrev', false) . '>Aug. 20</option></select></label>';
-        echo '<label class="pa-field">Card size <select class="pa-agenda-live-field" name="agenda[card_size]"><option value="full" ' . selected($card_size, 'full', false) . '>Full: compact speaker cards</option><option value="thin" ' . selected($card_size, 'thin', false) . '>Thin: title/meta only</option></select></label>';
-        echo '</div></details>';
-        echo '</section>';
+    private function program_sponsor_levels_for_js() {
+        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
+        $data = [];
+        foreach ($programs as $program) {
+            $levels = get_post_meta($program->ID, '_pa_sponsor_levels', true);
+            if (!is_array($levels)) { $levels = []; }
+            $data[$program->ID] = array_values(array_filter(array_unique(array_map('sanitize_text_field', $levels))));
+        }
+        return $data;
     }
 
-
-
-    private function speaker_card_controls($s) {
-        $show_thumb = isset($s['show_thumbnail']) ? $s['show_thumbnail'] : '1';
-        $shape = $s['thumbnail_shape'] ?? 'theme';
-        echo '<section class="pa-program-design-panel pa-speaker-card-section pa-advanced-tab-panel" data-pa-program-panel="speaker-card"><h4>Speaker Card Settings</h4><p class="description">These cards appear on agenda event listings and individual event pages.</p>';
-
-        echo '<div class="pa-card-options-row pa-card-color-row">';
-        echo $this->color_control('speaker_card[background]', $s['background'] ?? '', '', 'Background color', 'Speaker card background color');
-        echo $this->color_control('speaker_card[color]', $s['color'] ?? '', '', 'Text color', 'Speaker card text color');
-        echo '</div>';
-
-        echo '<div class="pa-card-options-row pa-card-border-row">';
-        $this->program_border_controls('speaker_card', $s, 'Border', 'pa-speaker-card-live-field');
-        echo '</div>';
-
-        echo '<div class="pa-card-thumbnail-control">';
-        echo '<div class="pa-field-heading">Thumbnail</div>';
-        echo '<div class="pa-card-thumbnail-inline">';
-        echo '<label class="pa-field pa-checkbox-field"><input class="pa-speaker-card-live-field" type="checkbox" name="speaker_card[show_thumbnail]" value="1" ' . checked($show_thumb, '1', false) . '> Show/hide</label>';
-        echo '<label class="pa-field pa-thumbnail-shape-field"><select class="pa-speaker-card-live-field" name="speaker_card[thumbnail_shape]"><option value="theme" ' . selected($shape, 'theme', false) . '>Theme/default</option><option value="square" ' . selected($shape, 'square', false) . '>Square</option><option value="circle" ' . selected($shape, 'circle', false) . '>Circle</option></select></label>';
-        echo '</div>';
-        echo '</div>';
-        echo '</section>';
+    private function program_date_options($program_id) {
+        $dates = [];
+        $start = get_post_meta($program_id, '_pa_program_start_date', true);
+        $end = get_post_meta($program_id, '_pa_program_end_date', true);
+        $this->append_date_range_options($dates, $start, $end);
+        $additional = get_post_meta($program_id, '_pa_program_additional_dates', true);
+        if (is_array($additional)) {
+            foreach ($additional as $range) {
+                $this->append_date_range_options($dates, $range['start'] ?? '', $range['end'] ?? '');
+            }
+        }
+        $unique = [];
+        foreach ($dates as $date) { $unique[$date] = $date; }
+        return array_values($unique);
     }
 
-
-    private function combined_program_preview($agenda, $speaker_card) {
-        echo '<section class="pa-combined-preview-section"><h3>Preview</h3>';
-        echo '<div class="pa-agenda-tabs-preview pa-agenda-day-tabs" hidden><div class="pa-agenda-day-tab-list"><button type="button" class="pa-agenda-day-tab active">8/20</button><button type="button" class="pa-agenda-day-tab">8/21</button></div></div>';
-        echo '<article class="pa-event-card pa-event-card-preview pa-event-card--has-speakers pa-event-card--speakers-inline pa-event-card--size-full">';
-        echo '<div class="pa-event-card__datebar"><span class="pa-event-card__date pa-event-card-preview-date">8/20</span><span class="pa-event-card__time">00:00</span></div>';
-        echo '<div class="pa-event-card__body"><div class="pa-event-card__summary"><h4 class="pa-event-card__title"><span class="pa-preview-line pa-preview-line-title"></span></h4><p class="pa-event-card__meta"><span class="pa-event-card__category"><span class="pa-event-card__category-icon">★</span><span class="pa-preview-line pa-preview-line-short"></span></span><span class="pa-event-card__meta-dot" aria-hidden="true">•</span><span class="pa-preview-line pa-preview-line-medium"></span></p><div class="pa-event-card__description pa-event-card-preview-description"><span class="pa-preview-line pa-preview-line-content"></span><span class="pa-preview-line pa-preview-line-content"></span></div></div>';
-        echo '<div class="pa-event-card__speakers"><div class="pa-speaker-card-list pa-speaker-card-list-agenda"><article class="pa-speaker-card pa-speaker-card-preview"><span class="pa-speaker-card-image"><span class="pa-speaker-card-thumb pa-speaker-card-preview-thumb" aria-hidden="true"></span></span><div class="pa-speaker-card-text pa-speaker-card-preview-text"><span class="pa-preview-line pa-preview-line-speaker-name"></span><span class="pa-preview-line pa-preview-line-speaker-role"></span><span class="pa-preview-line pa-preview-line-speaker-company"></span></div></article></div></div></div></article>';
-        echo '</section>';
+    private function append_date_range_options(&$dates, $start, $end) {
+        $start_ts = $start ? strtotime($start) : false;
+        $end_ts = $end ? strtotime($end) : $start_ts;
+        if (!$start_ts) { return; }
+        if (!$end_ts || $end_ts < $start_ts) { $end_ts = $start_ts; }
+        for ($ts = $start_ts; $ts <= $end_ts; $ts = strtotime('+1 day', $ts)) {
+            $dates[] = date('Y-m-d', $ts);
+        }
     }
 
+    private function category_icon_options() {
+        return ['none'=>'None','star'=>'Star','circle'=>'Circle','square'=>'Square','diamond'=>'Diamond','heart'=>'Heart','bolt'=>'Bolt','check'=>'Check','plus'=>'Plus','flag'=>'Flag'];
+    }
+
+    private function color_control($name, $value, $fallback = '', $label = '', $aria_label = '') {
+        $fallback = $fallback !== '' ? $fallback : '#000000';
+        $safe_value = sanitize_hex_color($value) ?: '';
+        $swatch_value = $safe_value ?: $fallback;
+        $field_id = 'pa-color-' . sanitize_key(str_replace(['[',']'], '-', $name));
+        $label_text = $label !== '' ? $label : 'Color';
+        $aria_label = $aria_label !== '' ? $aria_label : $label_text;
+        return '<label class="pa-color-control" for="' . esc_attr($field_id) . '"><span class="pa-color-control-label">' . esc_html($label_text) . '</span><span class="pa-color-input-wrap"><input id="' . esc_attr($field_id) . '" type="text" class="pa-color" name="' . esc_attr($name) . '" value="' . esc_attr($safe_value) . '" placeholder="' . esc_attr($fallback) . '" aria-label="' . esc_attr($aria_label) . '"><span class="pa-color-swatch" style="background-color:' . esc_attr($swatch_value) . '"></span></span></label>';
+    }
 
     private function program_page_preview($type, $s) {
-        if (!is_array($s)) { $s = []; }
         $is_speaker = $type === 'speaker';
-        echo '<section class="pa-preview-card pa-program-page-preview-card"><div class="pa-preview-title"><h3>Preview</h3></div>';
+        echo '<section class="pa-program-page-preview pa-program-page-preview-' . esc_attr($type) . '"><div class="pa-preview-label">Live preview</div>';
         echo '<div class="pa-live-preview" data-program-page-preview="' . esc_attr($type) . '">';
         if ($is_speaker) {
             echo '<div class="pa-preview-header pa-preview-speaker-header" style="' . esc_attr($this->inline_header_style($s)) . '"><span class="pa-preview-image" style="' . esc_attr($this->preview_image_style($s)) . '"></span><div class="pa-preview-speaker-text"><span class="pa-preview-line pa-preview-line-heading"></span><span class="pa-preview-line pa-preview-line-subheading"></span><span class="pa-preview-line pa-preview-line-subheading"></span></div><nav class="pa-preview-speaker-icons" aria-label="Preview speaker links"><span class="pa-preview-icon" aria-hidden="true">↗</span><span class="pa-preview-icon" aria-hidden="true">◎</span></nav></div>';
@@ -1559,7 +1257,7 @@ echo '</label>';
         echo '</div></div>';
         echo '<div class="pa-border-section"><div class="pa-border-section-title"><strong>Border width</strong><label><input class="pa-lock-width" type="checkbox" name="' . $root_attr . '[' . $prefix . '][lock_width]" value="1" ' . checked(!empty($v['lock_width']), true, false) . '> Same for every side</label></div>';
         echo '<div class="pa-border-grid pa-width-fields">';
-        foreach (['top'=>'Top','right'=>'Right','bottom'=>'Bottom','left'=>'Left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-width-input" type="number" min="0" name="' . $root_attr . '[' . $prefix . '][width_' . esc_attr($k) . ']" value="' . esc_attr($v['width_'.$k] ?? 0) . '" placeholder="0"></label>'; }
+        foreach (['top'=>'Top','right'=>'Right','bottom'=>'Bottom','left'] as $k=>$lab) { echo '<label>' . esc_html($lab) . '<input class="pa-width-input" type="number" min="0" name="' . $root_attr . '[' . $prefix . '][width_' . esc_attr($k) . ']" value="' . esc_attr($v['width_'.$k] ?? 0) . '" placeholder="0"></label>'; }
         echo '</div></div>';
         echo '<div class="pa-border-section pa-border-color-section">' . $this->color_control($root . '[' . $key . '][color]', $v['color'] ?? '', '', '', $label . ' border color') . '</div>';
         echo '</details>';
@@ -1635,201 +1333,166 @@ echo '</label>';
         wp_editor($post ? $post->post_content : '', 'event_description', ['textarea_name'=>'event_description','media_buttons'=>false,'textarea_rows'=>8]);
         echo '</div>';
 
-        echo '<div class="pa-field pa-event-half pa-event-checkbox-block"><span class="pa-field-heading">Invite only</span><label class="pa-checkbox-control"><input type="checkbox" name="event_invite_only" value="1" class="pa-invite-only-toggle" ' . checked($invite_only, '1', false) . '> Enable invite-only message</label></div>';
-        echo '<div class="pa-field pa-event-half pa-event-checkbox-block"><span class="pa-field-heading">Add to Calendar</span><label class="pa-checkbox-control"><input type="checkbox" name="event_show_add_to_calendar" value="1" ' . checked($id ? get_post_meta($id, '_pa_event_show_add_to_calendar', true) : '', '1', false) . '> Show Add to Calendar link</label></div>';
-
-        echo '<div class="pa-editor-field pa-invite-warning-editor pa-event-span-full" ' . ($invite_only === '1' ? '' : 'hidden') . '><label class="pa-field-heading">Invite-only custom message</label><p class="description">Message shown on the individual event page below the invite-only notice.</p>';
-        wp_editor($id ? get_post_meta($id, '_pa_event_invite_warning', true) : '', 'event_invite_warning', ['textarea_name'=>'event_invite_warning','media_buttons'=>false,'textarea_rows'=>4]);
-        echo '</div>';
+        echo '<div class="pa-field pa-event-half pa-event-checkbox-block"><span class="pa-field-heading">Invite only</span><label class="pa-checkbox-control"><input type="checkbox" name="event_invite_only" value="1" ' . checked($invite_only, '1', false) . '> <span>Show invite-only warning on event page</span></label></div>';
+        echo '<label class="pa-field pa-event-half"><span class="pa-field-heading">Invite-only message</span><textarea name="event_invite_warning" rows="3" placeholder="Invite only. Please contact the event team for access.">' . esc_textarea($id ? get_post_meta($id, '_pa_event_invite_warning', true) : '') . '</textarea></label>';
+        echo '<div class="pa-field pa-event-half pa-event-checkbox-block"><span class="pa-field-heading">Add to Calendar</span><label class="pa-checkbox-control"><input type="checkbox" name="event_show_add_to_calendar" value="1" ' . checked($id ? get_post_meta($id, '_pa_event_show_add_to_calendar', true) : '', '1', false) . '> <span>Show add-to-calendar button on event page</span></label></div>';
 
         echo '</div><div class="pa-event-section pa-event-section-4">';
 
-        echo '<section class="pa-field pa-speakers-field pa-event-half"><h3 class="pa-field-heading">Speakers</h3><p class="description">Searchable and multi-selectable. Selected speakers can be reordered below.</p><div class="pa-speaker-toolbar"><input type="search" class="pa-speaker-search" placeholder="Search speakers by name, company, role, or credentials"><button type="button" class="button pa-select-all-speakers">Select all visible</button></div><div class="pa-speaker-picker">';
-        foreach ($speakers as $sp) {
-            $speaker_company = get_post_meta($sp->ID, '_pa_speaker_company', true);
-            $speaker_role = get_post_meta($sp->ID, '_pa_speaker_role_title', true);
-            $speaker_credentials = get_post_meta($sp->ID, '_pa_speaker_credentials', true);
-            $speaker_search_terms = strtolower(trim($sp->post_title . ' ' . $speaker_company . ' ' . $speaker_role . ' ' . $speaker_credentials));
-            echo '<label data-name="' . esc_attr($speaker_search_terms) . '"><input type="checkbox" class="pa-speaker-check" value="' . esc_attr($sp->ID) . '" ' . checked(in_array($sp->ID, array_map('intval', $speaker_ids), true), true, false) . '> ' . esc_html($sp->post_title) . '</label>';
+        echo '<section class="pa-field pa-speaker-picker-field pa-event-span-full"><h3 class="pa-field-heading">Speakers</h3><div class="pa-speaker-picker-toolbar"><input type="search" class="pa-speaker-picker-search" placeholder="Search speakers"><button type="button" class="button pa-select-all-speakers">Select all visible</button></div><div class="pa-speaker-picker">';
+        foreach ($speakers as $speaker) {
+            $role = get_post_meta($speaker->ID, '_pa_speaker_role_title', true);
+            $company = get_post_meta($speaker->ID, '_pa_speaker_company', true);
+            $search_terms = strtolower(trim($speaker->post_title . ' ' . $role . ' ' . $company));
+            echo '<label data-name="' . esc_attr($search_terms) . '"><input type="checkbox" class="pa-speaker-check" value="' . esc_attr($speaker->ID) . '" ' . checked(in_array($speaker->ID, array_map('intval', $speaker_ids)), true, false) . '> ' . esc_html($speaker->post_title) . '</label>';
         }
-        echo '</div><ul class="pa-selected-speakers pa-selected-speakers-with-categories" data-empty="No speakers selected.">';
-        foreach ($speaker_ids as $sid) { echo $this->selected_speaker_admin_row($sid, $event_speaker_categories, $speaker_categories); }
-        echo '</ul><template id="pa-speaker-category-select-template"><span class="pa-selected-speaker-category-wrap"><label><span class="screen-reader-text">Speaker category</span><select class="pa-selected-speaker-category" name="speaker_categories[__SPEAKER_ID__]">' . $this->speaker_category_options_html($speaker_categories) . '</select></label></span></template><input type="hidden" name="speaker_order" class="pa-speaker-order" value="' . esc_attr(implode(',', array_map('intval', $speaker_ids))) . '"></section>';
+        echo '</div><ul class="pa-selected-speakers" data-empty="No speakers selected.">';
+        foreach ($speaker_ids as $sid) {
+            $sp = get_post($sid);
+            if ($sp) {
+                $speaker_category = '';
+                foreach ([$sid, (string)$sid] as $speaker_category_key) {
+                    if (isset($event_speaker_categories[$speaker_category_key])) { $speaker_category = $event_speaker_categories[$speaker_category_key]; break; }
+                }
+                echo '<li data-id="' . esc_attr($sid) . '"><span class="pa-drag-handle">↕</span><strong>' . esc_html($sp->post_title) . '</strong><button type="button" class="button-link pa-remove-speaker">Remove</button><div class="pa-speaker-event-category"><label>Speaker category<select name="speaker_categories[' . esc_attr($sid) . ']"><option value="">None</option>';
+                foreach ($speaker_categories as $speaker_category_option) {
+                    echo '<option value="' . esc_attr($speaker_category_option) . '" ' . selected($speaker_category, $speaker_category_option, false) . '>' . esc_html($speaker_category_option) . '</option>';
+                }
+                echo '</select></label></div></li>';
+            }
+        }
+        echo '</ul><input type="hidden" name="speaker_order" class="pa-speaker-order" value="' . esc_attr(implode(',', array_map('intval', $speaker_ids))) . '"></section>';
 
-        echo '<section class="pa-field pa-sponsors-field pa-event-half"><h3 class="pa-field-heading">Sponsors</h3><p class="description">Searchable and multi-selectable. Choose from sponsors created in the Sponsors tab.</p><div class="pa-sponsor-toolbar"><input type="search" class="pa-sponsor-search" placeholder="Search sponsors by company, program, level, or bio"><button type="button" class="button pa-select-all-sponsors">Select all visible</button></div><div class="pa-sponsor-picker">';
+        echo '</div><div class="pa-event-section pa-event-section-5">';
+        echo '<section class="pa-field pa-sponsor-picker-field pa-event-span-full"><h3 class="pa-field-heading">Sponsors</h3><p class="description">Search and select sponsors to display on this event page.</p><div class="pa-sponsor-picker-toolbar"><input type="search" class="pa-sponsor-picker-search" placeholder="Search sponsors"><button type="button" class="button pa-select-all-sponsors">Select all visible</button></div><div class="pa-sponsor-picker">';
         foreach ($sponsors as $sponsor) {
-            $sponsor_program_id = absint(get_post_meta($sponsor->ID, '_pa_sponsor_program_id', true));
-            $sponsor_program_title = $sponsor_program_id ? get_the_title($sponsor_program_id) : '';
-            $sponsor_levels = $this->sponsor_levels_for_program($sponsor->ID, $program_id);
-            $sponsor_search_terms = strtolower(trim($sponsor->post_title . ' ' . $sponsor_program_title . ' ' . implode(' ', $sponsor_levels) . ' ' . wp_strip_all_tags($sponsor->post_content)));
-            echo '<label data-name="' . esc_attr($sponsor_search_terms) . '"><input type="checkbox" class="pa-sponsor-check" value="' . esc_attr($sponsor->ID) . '" ' . checked(in_array($sponsor->ID, array_map('intval', $sponsor_ids), true), true, false) . '> ' . esc_html($sponsor->post_title) . '</label>';
+            $levels = $this->sponsor_all_levels($sponsor->ID);
+            $search_terms = strtolower(trim($sponsor->post_title . ' ' . implode(' ', $levels)));
+            echo '<label data-name="' . esc_attr($search_terms) . '"><input type="checkbox" class="pa-sponsor-check" value="' . esc_attr($sponsor->ID) . '" ' . checked(in_array($sponsor->ID, array_map('intval', $sponsor_ids)), true, false) . '> ' . esc_html($sponsor->post_title) . '</label>';
         }
         echo '</div><ul class="pa-selected-sponsors" data-empty="No sponsors selected.">';
-        foreach ($sponsor_ids as $sid) { $sponsor = get_post($sid); if ($sponsor) { echo '<li data-id="' . esc_attr($sid) . '"><span class="pa-selected-sponsor-name">' . esc_html($sponsor->post_title) . '</span><span class="pa-selected-sponsor-actions"><button type="button" class="button-link pa-move-sponsor-up" aria-label="Move up" title="Move up"><span aria-hidden="true">▲</span><span class="screen-reader-text">Move up</span></button> <button type="button" class="button-link pa-move-sponsor-down" aria-label="Move down" title="Move down"><span aria-hidden="true">▼</span><span class="screen-reader-text">Move down</span></button> <button type="button" class="button-link pa-remove-sponsor">Remove</button></span></li>'; } }
+        foreach ($sponsor_ids as $sponsor_id) {
+            $sponsor = get_post($sponsor_id);
+            if ($sponsor && $sponsor->post_type === 'pa_sponsor') {
+                echo '<li data-id="' . esc_attr($sponsor_id) . '"><span class="pa-drag-handle">↕</span><strong>' . esc_html($sponsor->post_title) . '</strong><button type="button" class="button-link pa-remove-sponsor">Remove</button></li>';
+            }
+        }
         echo '</ul><input type="hidden" name="sponsor_order" class="pa-sponsor-order" value="' . esc_attr(implode(',', array_map('intval', $sponsor_ids))) . '"></section>';
-
-        echo '</div>';
-        echo $this->form_actions($id ? 'Update Event' : 'Save Event', 'pa-event-actions');
-        echo '</div></form></div>';
+        echo '</div></div>';
+        echo $this->form_actions('Save Event') . '</form></div>';
     }
 
     public function form_speaker() {
         $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
         $post = $id ? get_post($id) : null;
+        $style_program_id = $id ? $this->speaker_primary_program_id($id) : 0;
+        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC']);
+        $speaker_event_ids = $id ? $this->speaker_event_ids($id) : [];
+        $all_events = get_posts(['post_type'=>'pa_event','post_status'=>['publish','draft'],'numberposts'=>-1,'meta_key'=>'_pa_event_date','orderby'=>'meta_value','order'=>'ASC']);
         $this->nav('speakers', $post ? $post->post_title : '');
         if (!empty($_GET['saved'])) { echo '<div class="notice notice-success is-dismissible pa-save-notice"><p>Saved successfully!</p></div>'; }
         echo '<h2>' . ($id ? 'Edit Speaker' : 'Add New Speaker') . '</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-form pa-comfortable-form pa-speaker-form">';
         wp_nonce_field('pa_save_speaker');
         echo '<input type="hidden" name="action" value="pa_save_speaker"><input type="hidden" name="id" value="' . esc_attr($id) . '"><input type="hidden" name="pa_post_status" value="publish" class="pa-post-status">';
-        $img = $id ? absint(get_post_meta($id, '_pa_speaker_image_id', true)) : 0;
-        $this->image_field('speaker_image_id', $img, 'Speaker image <span>*</span>', '500x500px recommended');
-        echo '<div class="pa-inline-fields pa-three-fields"><label class="pa-field">First Name <span>*</span><input required type="text" name="first_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_first_name', true) : '') . '"></label>';
-        echo '<label class="pa-field">Last Name <span>*</span><input required type="text" name="last_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_last_name', true) : '') . '"></label>';
-        echo '<label class="pa-field">Credentials<input type="text" name="credentials" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_credentials', true) : '') . '"></label></div>';
+        echo '<div class="pa-speaker-main-fields">';
+        echo '<div class="pa-speaker-name-row"><label class="pa-field">First Name <span>*</span><input required type="text" name="first_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_first_name', true) : '') . '"></label>';
+        echo '<label class="pa-field">Last Name <span>*</span><input required type="text" name="last_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_last_name', true) : '') . '"></label></div>';
         echo '<label class="pa-field pa-speaker-slug-field"><span class="pa-field-heading">Page URL Slug</span><input type="text" name="speaker_slug" value="' . esc_attr($post ? $post->post_name : '') . '" placeholder="auto-generate-from-name"><small>Used in the public speaker page URL. Leave blank to generate from the speaker name.</small></label>';
-        echo '<label class="pa-field">Company <span>*</span><input required type="text" name="company" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_company', true) : '') . '"></label>';
-        echo '<label class="pa-field">Role Title<input type="text" name="role_title" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_role_title', true) : '') . '"></label>';
-        echo '<div class="pa-inline-fields pa-two-fields"><label class="pa-field">LinkedIn<input type="url" name="linkedin" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_linkedin', true) : '') . '"></label>';
-        echo '<label class="pa-field">Website<input type="url" name="website" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_website', true) : '') . '"></label></div>';
-        $selected_event_ids = $id ? $this->speaker_event_ids($id) : [];
-        $events_for_speaker = get_posts(['post_type'=>'pa_event','post_status'=>['publish','draft'],'numberposts'=>-1,'meta_key'=>'_pa_event_date','orderby'=>'meta_value','order'=>'ASC']);
-        echo '<section class="pa-field pa-speaker-event-picker-field"><h3 class="pa-field-heading">Events</h3><p class="description">Searchable and multi-selectable. Selected events are automatically sorted by event date.</p><div class="pa-speaker-event-toolbar"><input type="search" class="pa-speaker-event-search" placeholder="Search events by title, program, date, category, or location"><button type="button" class="button pa-select-all-speaker-events">Select all visible</button></div><div class="pa-speaker-event-picker">';
-        foreach ($events_for_speaker as $event_for_speaker) {
-            $event_program_id = absint(get_post_meta($event_for_speaker->ID, '_pa_program_id', true));
-            $event_program_title = $event_program_id ? get_the_title($event_program_id) : '';
-            $event_when = $this->format_event_when($event_for_speaker->ID);
-            $event_category = get_post_meta($event_for_speaker->ID, '_pa_event_category', true);
-            $event_location = get_post_meta($event_for_speaker->ID, '_pa_event_location', true);
-            $event_label = $this->speaker_event_picker_label($event_for_speaker->ID);
-            $event_search_terms = strtolower(trim($event_for_speaker->post_title . ' ' . $event_program_title . ' ' . $event_when . ' ' . $event_category . ' ' . $event_location));
-            echo '<label data-name="' . esc_attr($event_search_terms) . '"><input type="checkbox" class="pa-speaker-event-check" name="speaker_event_ids[]" value="' . esc_attr($event_for_speaker->ID) . '" ' . checked(in_array(absint($event_for_speaker->ID), array_map('intval', $selected_event_ids), true), true, false) . '> ' . esc_html($event_label) . '</label>';
+        echo '<div class="pa-speaker-meta-row"><label class="pa-field">Credentials<input type="text" name="credentials" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_credentials', true) : '') . '"></label>';
+        echo '<label class="pa-field">Role / Title<input type="text" name="role_title" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_role_title', true) : '') . '"></label>';
+        echo '<label class="pa-field">Company<input type="text" name="company" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_company', true) : '') . '"></label></div>';
+        echo '<label class="pa-field">Program Style<select name="speaker_style_program_id"><option value="">Use default page style</option>';
+        foreach ($programs as $program) { echo '<option value="' . esc_attr($program->ID) . '" ' . selected($style_program_id, $program->ID, false) . '>' . esc_html($program->post_title) . '</option>'; }
+        echo '</select><small>Choose which Program\'s Speaker Page and Directory image styling should control this speaker.</small></label>';
+        echo '</div>';
+        $this->image_field('speaker_image_id', $id ? absint(get_post_meta($id, '_pa_speaker_image_id', true)) : 0, 'Headshot', 'Used on the speaker page, speaker cards, and directory.');
+        echo '<div class="pa-editor-field"><label>Bio</label>'; wp_editor($post ? $post->post_content : '', 'speaker_bio', ['textarea_name'=>'speaker_bio','media_buttons'=>false,'textarea_rows'=>8]); echo '</div>';
+        echo '<section class="pa-field pa-speaker-events-field"><h3 class="pa-field-heading">Events</h3><p class="description">Select every event this speaker appears on. This updates the event speaker lists automatically.</p><div class="pa-speaker-event-picker">';
+        foreach ($all_events as $event) {
+            $label = $this->speaker_event_picker_label($event->ID);
+            $search_terms = strtolower(trim($label));
+            echo '<label data-name="' . esc_attr($search_terms) . '"><input type="checkbox" name="speaker_event_ids[]" value="' . esc_attr($event->ID) . '" ' . checked(in_array(absint($event->ID), array_map('intval', $speaker_event_ids), true), true, false) . '> ' . esc_html($label) . '</label>';
         }
-        echo '</div><ul class="pa-selected-speaker-events" data-empty="No events selected.">';
-        foreach ($selected_event_ids as $selected_event_id) {
-            $selected_event_label = $this->speaker_event_picker_label($selected_event_id);
-            if ($selected_event_label) { echo '<li data-id="' . esc_attr($selected_event_id) . '"><span class="pa-selected-speaker-event-name">' . esc_html($selected_event_label) . '</span><button type="button" class="button-link pa-remove-speaker-event">Remove</button></li>'; }
-        }
-        echo '</ul></section>';
-        $style_program_id = $id ? absint(get_post_meta($id, '_pa_speaker_style_program_id', true)) : 0;
-        if (!$style_program_id && $id) { $style_program_id = $this->speaker_primary_program_id($id); }
-        $programs_for_style = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'date','order'=>'DESC']);
-        echo '<label class="pa-field">Program style<select name="speaker_style_program_id"><option value="">Default: most recent attached program</option>';
-        foreach ($programs_for_style as $program_for_style) { echo '<option value="' . esc_attr($program_for_style->ID) . '" ' . selected($style_program_id, $program_for_style->ID, false) . '>' . esc_html($program_for_style->post_title) . '</option>'; }
-        echo '</select><small>Controls which Program styling is used for this speaker page when the speaker appears in more than one program.</small></label>';
-        echo '<div class="pa-editor-field"><label>Bio <span>*</span></label>'; wp_editor($post ? $post->post_content : '', 'speaker_bio', ['textarea_name'=>'speaker_bio','media_buttons'=>false,'textarea_rows'=>8]); echo '</div>';
+        echo '</div></section>';
+        echo '<div class="pa-social-fields"><label class="pa-field">Website<input type="url" name="website" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_website', true) : '') . '"></label>';
+        echo '<label class="pa-field">LinkedIn<input type="url" name="linkedin" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_linkedin', true) : '') . '"></label></div>';
         echo $this->form_actions('Save Speaker') . '</form></div>';
     }
 
-    private function image_field($name, $image_id, $label, $description = '') {
-        echo '<div class="pa-image-field pa-field"><label>' . wp_kses_post($label) . '</label>';
-        if ($description) { echo '<p class="description pa-image-recommendation"><em>' . esc_html($description) . '</em></p>'; }
-        echo '<div class="pa-image-preview">';
-        if ($image_id) { echo wp_get_attachment_image($image_id, 'thumbnail'); }
-        echo '</div><input type="hidden" name="' . esc_attr($name) . '" value="' . esc_attr($image_id) . '"><button type="button" class="button pa-upload-image">Choose image</button> <button type="button" class="button pa-remove-image">Remove</button></div>';
+    private function image_field($name, $id, $label, $help = '') {
+        $url = $id ? wp_get_attachment_image_url($id, 'thumbnail') : '';
+        echo '<div class="pa-image-field"><label>' . esc_html($label) . '</label><input type="hidden" name="' . esc_attr($name) . '" value="' . esc_attr($id) . '" class="pa-image-id"><div class="pa-image-preview">' . ($url ? '<img src="'.esc_url($url).'" alt="">' : '') . '</div><button type="button" class="button pa-pick-image">Choose image</button><button type="button" class="button pa-remove-image">Remove</button>' . ($help ? '<p class="description">' . esc_html($help) . '</p>' : '') . '</div>';
     }
 
-    private function color_control($name, $value = '', $preview_key = '', $label = '', $aria_label = 'Color') {
-        $value = $value ? sanitize_hex_color($value) : '';
-        $theme_colors = $this->theme_palette_colors();
-        ob_start();
-        echo '<div class="pa-color-control' . ($label ? ' pa-field' : '') . '">';
-        if ($label) { echo '<span class="pa-color-label">' . esc_html($label) . '</span>'; }
-        echo '<input class="pa-color-value pa-preview-input" ' . ($preview_key ? 'data-preview="' . esc_attr($preview_key) . '"' : '') . ' type="hidden" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '">';
-        echo '<div class="pa-color-palette" role="group" aria-label="' . esc_attr($aria_label) . '">';
-        foreach ($theme_colors as $index => $color) {
-            $active = strtolower($value) === strtolower($color) ? ' active' : '';
-            echo '<button type="button" class="pa-color-swatch' . esc_attr($active) . '" data-color="' . esc_attr($color) . '" style="--pa-swatch-color:' . esc_attr($color) . '" title="Theme color ' . esc_attr($index + 1) . '"><span>Theme color ' . esc_html($index + 1) . '</span></button>';
-        }
-        echo '<button type="button" class="button pa-more-colors">More colors</button>';
-        echo '<button type="button" class="button-link pa-clear-color">Reset</button>';
+    public function form_program() {
+        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        $post = $id ? get_post($id) : null;
+        $agenda = $id ? get_post_meta($id, '_pa_agenda_settings', true) : [];
+        $speaker_card = $id ? get_post_meta($id, '_pa_speaker_card_settings', true) : [];
+        if (!is_array($agenda)) { $agenda = []; }
+        if (!is_array($speaker_card)) { $speaker_card = []; }
+        $cats = $id ? get_post_meta($id, '_pa_categories', true) : [];
+        if (!is_array($cats)) { $cats = []; }
+        $program_start = $id ? get_post_meta($id, '_pa_program_start_date', true) : '';
+        $program_end = $id ? get_post_meta($id, '_pa_program_end_date', true) : '';
+        $additional_dates = $id ? get_post_meta($id, '_pa_program_additional_dates', true) : [];
+        if (!is_array($additional_dates)) { $additional_dates = []; }
+        $all_same = $id ? get_post_meta($id, '_pa_categories_all_same', true) : '';
+        $event_settings = $this->settings_for_program($id, 'event');
+        $speaker_settings = $this->settings_for_program($id, 'speaker');
+        $speaker_categories = $id ? get_post_meta($id, '_pa_speaker_categories', true) : [];
+        if (!is_array($speaker_categories)) { $speaker_categories = []; }
+        $sponsor_levels = $id ? get_post_meta($id, '_pa_sponsor_levels', true) : [];
+        if (!is_array($sponsor_levels)) { $sponsor_levels = []; }
+        $primary_sponsor_level = $id ? get_post_meta($id, '_pa_primary_sponsor_level', true) : '';
+        if ($primary_sponsor_level !== '' && !in_array($primary_sponsor_level, $sponsor_levels, true)) { $primary_sponsor_level = ''; }
+        $this->nav('programs', $post ? $post->post_title : '');
+        if (!empty($_GET['saved'])) { echo '<div class="notice notice-success is-dismissible pa-save-notice"><p>Saved successfully!</p></div>'; }
+        echo '<h2>' . ($id ? 'Edit Program' : 'Add New Program') . '</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-form pa-comfortable-form pa-program-form">';
+        wp_nonce_field('pa_save_program');
+        echo '<input type="hidden" name="action" value="pa_save_program"><input type="hidden" name="id" value="' . esc_attr($id) . '"><input type="hidden" name="pa_post_status" value="publish" class="pa-post-status">';
+        echo '<label class="pa-field">Program Title <span>*</span><input required type="text" name="program_title" value="' . esc_attr($post ? $post->post_title : '') . '"></label>';
+        echo '<div class="pa-program-date-grid">';
+        echo '<label class="pa-field">Start Date <input type="date" name="program_start_date" value="' . esc_attr($program_start) . '"></label>';
+        echo '<label class="pa-field">End Date <input type="date" name="program_end_date" value="' . esc_attr($program_end) . '"></label>';
         echo '</div>';
-        echo '<div class="pa-color-popover" hidden><div class="pa-color-popover-inner"><button type="button" class="button-link pa-close-color" aria-label="Close color picker">×</button><label>Custom color <input class="pa-native-color" type="color" value="' . esc_attr($value ?: '#000000') . '"></label><input class="pa-hex-color" type="text" value="' . esc_attr($value) . '" placeholder="#000000"></div></div>';
+        echo '<div class="pa-additional-dates"><h3>Additional Date Ranges</h3><p class="description">Use this if the same Program has sessions on non-contiguous dates.</p><div class="pa-additional-date-list">';
+        foreach ($additional_dates as $i => $range) {
+            echo '<div class="pa-additional-date-row"><label>Start <input type="date" name="additional_dates[' . intval($i) . '][start]" value="' . esc_attr($range['start'] ?? '') . '"></label><label>End <input type="date" name="additional_dates[' . intval($i) . '][end]" value="' . esc_attr($range['end'] ?? '') . '"></label><button type="button" class="button pa-remove-additional-date">Remove</button></div>';
+        }
+        echo '</div><button type="button" class="button pa-add-additional-date">Add another date</button></div>';
+        echo '<label class="pa-field">Back to Program Link <input type="url" name="back_to_link" value="' . esc_attr($id ? get_post_meta($id, '_pa_back_to_link', true) : '') . '" placeholder="https://example.com/full-program-page"></label>';
+        echo '<div class="pa-settings-grid">';
+        echo '<div><h3>Agenda Settings</h3><label>Show descriptions<select name="agenda[show_descriptions]"><option value="show" '.selected($agenda['show_descriptions'] ?? '', 'show', false).'>Show</option><option value="hide" '.selected($agenda['show_descriptions'] ?? '', 'hide', false).'>Hide</option></select></label><label>Date display<select name="agenda[date_display]"><option value="numeric" '.selected($agenda['date_display'] ?? 'numeric', 'numeric', false).'>Numeric day</option><option value="abbrev" '.selected($agenda['date_display'] ?? '', 'abbrev', false).'>Abbreviated month + day</option></select></label></div>';
+        echo '<div><h3>Card Style</h3><label>Event card style<select name="agenda[card_size]"><option value="full" '.selected($agenda['card_size'] ?? 'full', 'full', false).'>Full cards with speakers</option><option value="thin" '.selected($agenda['card_size'] ?? '', 'thin', false).'>Thin cards without speakers</option></select></label></div>';
         echo '</div>';
-        return ob_get_clean();
-    }
-
-    private function preview_image_style($s) {
-        $css = '';
-        if (($s['image_shape'] ?? '') === 'circle') { $css .= 'border-radius:50%;'; }
-        elseif (($s['image_shape'] ?? '') === 'square') { $css .= 'border-radius:0;'; }
-        if (isset($s['image_border_width']) && $s['image_border_width'] !== '') { $css .= 'border-style:solid;border-width:' . absint($s['image_border_width']) . 'px;'; }
-        if (!empty($s['image_border_color'])) { $css .= 'border-color:' . esc_attr($s['image_border_color']) . ';'; }
-        return $css;
-    }
-
-    private function can_edit_pa_post($post_type, $id = 0) {
-        $id = absint($id);
-        if ($id) {
-            $post = get_post($id);
-            return $post && $post->post_type === $post_type && current_user_can('edit_post', $id);
+        echo '<section class="pa-card pa-categories"><h3>Categories</h3><label><input type="checkbox" name="categories_all_same" value="1" '.checked($all_same, '1', false).'> All categories same color and icon</label>';
+        $this->category_repeater($cats);
+        echo '</section>';
+        echo '<section class="pa-card"><h3>Speaker Categories</h3><p class="description">Optional labels used when assigning speakers to events, such as Panelist, Moderator, or Keynote.</p><div class="pa-speaker-category-repeater">';
+        if (!$speaker_categories) { $speaker_categories = [['name'=>'']]; }
+        foreach ($speaker_categories as $i => $speaker_category) {
+            $speaker_category_name = is_array($speaker_category) ? ($speaker_category['name'] ?? '') : $speaker_category;
+            echo '<div class="pa-speaker-category-row"><label>Category name<input type="text" name="speaker_categories[' . intval($i) . '][name]" value="' . esc_attr($speaker_category_name) . '"></label><button type="button" class="button pa-remove-speaker-category">Remove</button></div>';
         }
-        return current_user_can('edit_posts');
-    }
-
-    private function require_edit_pa_post($post_type, $id = 0) {
-        if (!$this->can_edit_pa_post($post_type, $id)) {
-            wp_die(esc_html__('You are not allowed to edit this item.', 'program-agenda'));
+        echo '</div><button type="button" class="button pa-add-speaker-category">Add speaker category</button></section>';
+        echo '<section class="pa-card"><h3>Sponsor Levels</h3><p class="description">Create sponsor levels, such as Platinum, Gold, or Supporting Sponsor. Sponsors can be assigned to one or more levels.</p><div class="pa-sponsor-level-repeater">';
+        if (!$sponsor_levels) { $sponsor_levels = ['']; }
+        foreach ($sponsor_levels as $i => $level) {
+            echo '<div class="pa-sponsor-level-row"><label>Level name<input type="text" name="sponsor_levels[' . intval($i) . ']" value="' . esc_attr($level) . '"></label><button type="button" class="button pa-remove-sponsor-level">Remove</button></div>';
         }
-    }
-
-    private function ensure_saved_post_id($result) {
-        if (is_wp_error($result)) {
-            wp_die(esc_html($result->get_error_message()));
+        echo '</div><button type="button" class="button pa-add-sponsor-level">Add sponsor level</button>';
+        echo '<label class="pa-field pa-primary-sponsor-level-field">Primary sponsor level<select name="primary_sponsor_level"><option value="">None</option>';
+        foreach ($sponsor_levels as $level) {
+            $level = sanitize_text_field($level);
+            if ($level === '') { continue; }
+            echo '<option value="' . esc_attr($level) . '" ' . selected($primary_sponsor_level, $level, false) . '>' . esc_html($level) . '</option>';
         }
-        $post_id = absint($result);
-        if (!$post_id) {
-            wp_die(esc_html__('The item could not be saved.', 'program-agenda'));
-        }
-        return $post_id;
-    }
-
-    private function save_program_advanced_meta($program_id) {
-        $agenda_in = (array)($_POST['agenda'] ?? []);
-        $agenda = [
-            'show_descriptions' => sanitize_key($agenda_in['show_descriptions'] ?? 'hide') === 'show' ? 'show' : 'hide',
-            'display_mode' => sanitize_key($agenda_in['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs',
-            'speaker_layout' => 'inline',
-            'date_display' => in_array(sanitize_key($agenda_in['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? sanitize_key($agenda_in['date_display'] ?? 'numeric') : 'numeric',
-            'card_size' => $this->normalize_agenda_card_size($agenda_in['card_size'] ?? 'full'),
-            'background' => sanitize_hex_color($agenda_in['background'] ?? '') ?: '',
-            'accent_bar_color' => sanitize_hex_color($agenda_in['accent_bar_color'] ?? '') ?: '',
-            'title_color' => sanitize_hex_color($agenda_in['title_color'] ?? ($agenda_in['color'] ?? '')) ?: '',
-            'location_color' => sanitize_hex_color($agenda_in['location_color'] ?? '') ?: '',
-            'tab_background_color' => sanitize_hex_color($agenda_in['tab_background_color'] ?? '') ?: '',
-            'tab_border_color' => sanitize_hex_color($agenda_in['tab_border_color'] ?? '') ?: '',
-            'tab_border' => $this->sanitize_tab_border_options($agenda_in['tab_border'] ?? []),
-            'border_color' => sanitize_hex_color($agenda_in['border_color'] ?? '') ?: '',
-        ];
-        $agenda = array_merge($agenda, $this->sanitize_program_border_options($agenda_in));
-        update_post_meta($program_id, '_pa_agenda_settings', $agenda);
-        update_post_meta($program_id, '_pa_show_event_descriptions', $agenda['show_descriptions']);
-
-        $card_in = (array)($_POST['speaker_card'] ?? []);
-        $card = [
-            'show_thumbnail' => !empty($card_in['show_thumbnail']) ? '1' : '0',
-            'thumbnail_shape' => sanitize_key($card_in['thumbnail_shape'] ?? 'theme'),
-            'background' => sanitize_hex_color($card_in['background'] ?? '') ?: '',
-            'color' => sanitize_hex_color($card_in['color'] ?? '') ?: '',
-            'border_color' => sanitize_hex_color($card_in['border_color'] ?? '') ?: '',
-        ];
-        $card = array_merge($card, $this->sanitize_program_border_options($card_in));
-        update_post_meta($program_id, '_pa_speaker_card_settings', $card);
-
-        if (isset($_POST['event_page_settings'])) {
-            update_post_meta($program_id, self::META_EVENT_SETTINGS, $this->sanitize_settings($_POST['event_page_settings']));
-        }
-        if (isset($_POST['speaker_page_settings'])) {
-            update_post_meta($program_id, self::META_SPEAKER_SETTINGS, $this->sanitize_settings($_POST['speaker_page_settings']));
-        }
-    }
-
-    public function save_program_advanced() {
-        check_admin_referer('pa_save_program_advanced');
-        $id = absint($_POST['id'] ?? 0);
-        $this->require_edit_pa_post('pa_program', $id);
-        $this->save_program_advanced_meta($id);
-        wp_safe_redirect(admin_url('admin.php?page=program-advanced-settings&id=' . $id . '&saved=1'));
-        exit;
+        echo '</select><small>Primary sponsors display larger on the sponsor showcase.</small></label>';
+        echo '</section>';
+        echo '<section class="pa-card"><h3>Event Page Settings</h3><input type="hidden" name="program_event_page_settings_json" value="' . esc_attr(wp_json_encode($event_settings)) . '">'; $this->program_page_settings_controls('event', $event_settings, 'event_page_settings'); echo '</section>';
+        echo '<section class="pa-card"><h3>Speaker Page Settings</h3><input type="hidden" name="program_speaker_page_settings_json" value="' . esc_attr(wp_json_encode($speaker_settings)) . '">'; $this->program_page_settings_controls('speaker', $speaker_settings, 'speaker_page_settings'); echo '</section>';
+        echo $this->form_actions('Save Program') . '</form></div>';
     }
 
     public function save_program() {
@@ -1837,8 +1500,7 @@ echo '</label>';
         $id = absint($_POST['id'] ?? 0);
         $this->require_edit_pa_post('pa_program', $id);
         $title = sanitize_text_field($_POST['program_title'] ?? '');
-        $status = $this->requested_post_status();
-        $postarr = ['post_type'=>'pa_program','post_title'=>$title,'post_name'=>sanitize_title($title),'post_status'=>$status];
+        $postarr = ['post_type'=>'pa_program','post_title'=>$title,'post_status'=>$this->requested_post_status()];
         if ($id) { $postarr['ID'] = $id; $new_id = wp_update_post($postarr, true); } else { $new_id = wp_insert_post($postarr, true); }
         $new_id = $this->ensure_saved_post_id($new_id);
         $program_start = sanitize_text_field($_POST['program_start_date'] ?? '');
@@ -2143,31 +1805,20 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         if ($ext === 'xlsx') { $rows = $this->parse_xlsx_rows($tmp); }
         elseif ($ext === 'csv') { $rows = $this->parse_csv_rows($tmp); }
         else { return new WP_Error('pa_bad_import_type', 'Use a CSV, XLSX, or ZIP file.'); }
-        return is_wp_error($rows) ? $rows : ['rows'=>$rows, 'images'=>$images, 'temp_dir'=>''];
-    }
-
-    private function cleanup_import_temp_dir($dir) {
-        $dir = trailingslashit((string)$dir);
-        if ($dir === '/' || !is_dir($dir) || strpos($dir, trailingslashit(get_temp_dir()) . 'pa-import-') !== 0) { return; }
-        $files = glob($dir . '*');
-        if (is_array($files)) {
-            foreach ($files as $file) {
-                if (is_file($file)) { @unlink($file); }
-            }
-        }
-        @rmdir($dir);
+        if (is_wp_error($rows)) { return $rows; }
+        return ['rows'=>$rows, 'images'=>$images, 'temp_dir'=>''];
     }
 
     private function parse_csv_rows($path) {
         $handle = fopen($path, 'r');
         if (!$handle) { return new WP_Error('pa_csv_open', 'Could not read the CSV file.'); }
         $header = fgetcsv($handle);
-        if (!$header) { fclose($handle); return new WP_Error('pa_csv_header', 'The spreadsheet needs a header row.'); }
+        if (!$header) { fclose($handle); return new WP_Error('pa_csv_header', 'CSV file is missing a header row.'); }
         $header = array_map([$this, 'normalize_import_key'], $header);
         $rows = [];
         while (($data = fgetcsv($handle)) !== false) {
             $row = [];
-            foreach ($header as $i => $key) { if ($key !== '') { $row[$key] = isset($data[$i]) ? trim((string)$data[$i]) : ''; } }
+            foreach ($header as $i => $key) { $row[$key] = $data[$i] ?? ''; }
             $rows[] = $row;
         }
         fclose($handle);
@@ -2175,328 +1826,271 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
     }
 
     private function parse_xlsx_rows($path) {
-        if (!class_exists('ZipArchive')) { return new WP_Error('pa_xlsx_missing', 'This server does not support XLSX imports. Save the template as CSV instead.'); }
+        if (!class_exists('ZipArchive')) { return new WP_Error('pa_xlsx_missing_zip', 'This server does not support XLSX imports. Upload CSV instead.'); }
         $zip = new ZipArchive();
-        if ($zip->open($path) !== true) { return new WP_Error('pa_xlsx_open', 'Could not open the XLSX file.'); }
+        if ($zip->open($path) !== true) { return new WP_Error('pa_xlsx_open', 'Could not open XLSX file.'); }
         $shared = [];
         $shared_xml = $zip->getFromName('xl/sharedStrings.xml');
         if ($shared_xml) {
-            $sx = @simplexml_load_string($shared_xml);
-            if ($sx) { foreach ($sx->si as $si) { $shared[] = (string)$si->t; } }
-        }
-        $sheet_xml = $zip->getFromName('xl/worksheets/sheet1.xml');
-        $zip->close();
-        if (!$sheet_xml) { return new WP_Error('pa_xlsx_sheet', 'Could not find the first worksheet in the XLSX file.'); }
-        $xml = @simplexml_load_string($sheet_xml);
-        if (!$xml) { return new WP_Error('pa_xlsx_parse', 'Could not read the XLSX worksheet.'); }
-        $table = [];
-        foreach ($xml->sheetData->row as $row) {
-            $cells = [];
-            foreach ($row->c as $c) {
-                $ref = (string)$c['r'];
-                preg_match('/[A-Z]+/', $ref, $m);
-                $col = $this->xlsx_col_index($m[0] ?? 'A');
-                $type = (string)$c['t'];
-                $value = (string)$c->v;
-                if ($type === 's') { $value = $shared[(int)$value] ?? ''; }
-                elseif ($type === 'inlineStr') { $value = (string)$c->is->t; }
-                $cells[$col] = trim($value);
+            $xml = simplexml_load_string($shared_xml);
+            if ($xml) {
+                foreach ($xml->si as $si) {
+                    $text = '';
+                    if (isset($si->t)) { $text = (string)$si->t; }
+                    elseif (isset($si->r)) { foreach ($si->r as $r) { $text .= (string)$r->t; } }
+                    $shared[] = $text;
+                }
             }
-            if ($cells) { $table[] = $cells; }
         }
-        if (!$table) { return []; }
-        $header_cells = array_shift($table);
-        $max = max(array_keys($header_cells));
-        $header = [];
-        for ($i=0; $i <= $max; $i++) { $header[$i] = $this->normalize_import_key($header_cells[$i] ?? ''); }
+        $sheet_name = 'xl/worksheets/sheet1.xml';
+        $sheet_xml = $zip->getFromName($sheet_name);
+        if (!$sheet_xml) {
+            for ($i=1; $i<=10; $i++) {
+                $candidate = 'xl/worksheets/sheet'.$i.'.xml';
+                $sheet_xml = $zip->getFromName($candidate);
+                if ($sheet_xml) { break; }
+            }
+        }
+        if (!$sheet_xml) { $zip->close(); return new WP_Error('pa_xlsx_sheet', 'XLSX file has no readable worksheet.'); }
+        $xml = simplexml_load_string($sheet_xml);
         $rows = [];
-        foreach ($table as $cells) {
+        foreach ($xml->sheetData->row as $row_node) {
             $row = [];
-            foreach ($header as $i => $key) { if ($key !== '') { $row[$key] = $cells[$i] ?? ''; } }
-            $rows[] = $row;
+            foreach ($row_node->c as $cell) {
+                $ref = (string)$cell['r'];
+                $col = preg_replace('/\d+/', '', $ref);
+                $idx = $this->xlsx_col_index($col);
+                $type = (string)$cell['t'];
+                $value = isset($cell->v) ? (string)$cell->v : '';
+                if ($type === 's' && $value !== '' && isset($shared[(int)$value])) { $value = $shared[(int)$value]; }
+                elseif ($type === 'inlineStr' && isset($cell->is->t)) { $value = (string)$cell->is->t; }
+                $row[$idx] = $value;
+            }
+            if ($row) {
+                ksort($row);
+                $max = max(array_keys($row));
+                $rows[] = array_replace(array_fill(0, $max + 1, ''), $row);
+            }
         }
-        return $rows;
+        $zip->close();
+        if (!$rows) { return new WP_Error('pa_xlsx_empty', 'XLSX file has no rows.'); }
+        $header = array_map([$this, 'normalize_import_key'], array_shift($rows));
+        $assoc = [];
+        foreach ($rows as $data) {
+            $row = [];
+            foreach ($header as $i => $key) { $row[$key] = $data[$i] ?? ''; }
+            $assoc[] = $row;
+        }
+        return $assoc;
     }
 
     private function xlsx_col_index($letters) {
+        $letters = strtoupper($letters);
         $n = 0;
-        foreach (str_split($letters) as $ch) { $n = $n * 26 + (ord($ch) - 64); }
+        for ($i=0; $i<strlen($letters); $i++) { $n = $n * 26 + (ord($letters[$i]) - 64); }
         return $n - 1;
     }
 
     private function normalize_import_key($key) {
-        return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower((string)$key)), '_');
+        $key = strtolower(trim((string)$key));
+        $key = preg_replace('/[^a-z0-9]+/', '_', $key);
+        return trim($key, '_');
     }
 
-    private function split_import_list($value) {
-        return array_values(array_filter(array_map('trim', preg_split('/\s*[|,;]\s*/', (string)$value))));
+    private function import_event_row($row, $status, $images) {
+        $program_id = $this->find_program_id($row['program'] ?? '');
+        if (!$program_id) { return false; }
+        $title = sanitize_text_field($row['event_title'] ?? $row['title'] ?? '');
+        if ($title === '') { return false; }
+        $date = $this->normalize_import_date($row['date'] ?? $row['event_date'] ?? '');
+        $start_time = $this->normalize_import_time($row['start_time'] ?? $row['time'] ?? '');
+        $end_time = $this->normalize_import_time($row['end_time'] ?? '');
+        $location = sanitize_text_field($row['location'] ?? '');
+        $description = wp_kses_post($row['description'] ?? '');
+        if (!$date || !$start_time || !$location || $description === '') { return false; }
+        $category = sanitize_text_field($row['category'] ?? '');
+        $event_id = wp_insert_post(['post_type'=>'pa_event','post_status'=>$status,'post_title'=>$title,'post_content'=>$description], true);
+        if (is_wp_error($event_id) || !$event_id) { return false; }
+        update_post_meta($event_id, '_pa_program_id', $program_id);
+        update_post_meta($event_id, '_pa_event_category', $category);
+        update_post_meta($event_id, '_pa_event_date', $date);
+        update_post_meta($event_id, '_pa_event_time', $start_time);
+        update_post_meta($event_id, '_pa_event_end_time', $end_time);
+        update_post_meta($event_id, '_pa_event_location', $location);
+        update_post_meta($event_id, '_pa_event_location_link', esc_url_raw($row['location_link'] ?? ''));
+        if (!empty($row['header_image'])) { update_post_meta($event_id, '_pa_event_image_id', $this->import_image_value($row['header_image'], $images)); }
+        $speaker_ids = $this->find_speaker_ids($row['speakers'] ?? '');
+        update_post_meta($event_id, '_pa_speaker_ids', $speaker_ids);
+        $sponsor_ids = $this->find_sponsor_ids($row['sponsors'] ?? '');
+        update_post_meta($event_id, '_pa_sponsor_ids', $sponsor_ids);
+        update_post_meta($event_id, '_pa_event_show_add_to_calendar', !empty($row['show_add_to_calendar']) ? '1' : '0');
+        if ($category !== '') { $this->ensure_program_category($program_id, $category); }
+        return true;
     }
 
-    private function find_program_id_by_import_value($value) {
-        global $wpdb;
-        $value = trim((string)$value);
-        if ($value === '') { return 0; }
-        if (ctype_digit($value) && get_post_type((int)$value) === 'pa_program') { return (int)$value; }
-        $title_matches = get_posts([
-            'post_type' => 'pa_program',
-            'post_status' => ['publish','draft'],
-            'title' => $value,
-            'numberposts' => 1,
-            'fields' => 'ids',
-        ]);
-        if ($title_matches) { return absint($title_matches[0]); }
-        $slug_matches = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'name'=>sanitize_title($value),'numberposts'=>1,'fields'=>'ids']);
-        if ($slug_matches) { return absint($slug_matches[0]); }
-        return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'pa_program' AND post_status IN ('publish','draft') AND LOWER(post_title) = LOWER(%s) ORDER BY post_status = 'publish' DESC, ID DESC LIMIT 1",
-            $value
-        ));
-    }
-
-    private function find_pa_post_by_title($title, $post_type) {
-        return $this->find_pa_post_by_import_value($title, $post_type);
-    }
-
-    private function find_pa_post_by_import_value($value, $post_type) {
-        global $wpdb;
-        $value = trim(wp_strip_all_tags((string)$value));
-        if ($value === '' || !in_array($post_type, ['pa_speaker','pa_sponsor','pa_event','pa_program'], true)) { return 0; }
-        if (ctype_digit($value) && get_post_type((int)$value) === $post_type) { return (int)$value; }
-
-        $title_matches = get_posts([
-            'post_type' => $post_type,
-            'post_status' => ['publish','draft'],
-            'title' => $value,
-            'numberposts' => 1,
-            'fields' => 'ids',
-        ]);
-        if ($title_matches) { return absint($title_matches[0]); }
-
-        $slug_matches = get_posts([
-            'post_type' => $post_type,
-            'post_status' => ['publish','draft'],
-            'name' => sanitize_title($value),
-            'numberposts' => 1,
-            'fields' => 'ids',
-        ]);
-        if ($slug_matches) { return absint($slug_matches[0]); }
-
-        $id = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status IN ('publish','draft') AND LOWER(post_title) = LOWER(%s) ORDER BY post_status = 'publish' DESC, ID DESC LIMIT 1",
-            $post_type,
-            $value
-        ));
-        if ($id) { return $id; }
-
-        if ($post_type === 'pa_speaker') {
-            $parts = preg_split('/\s+/', $value);
-            $first = $parts ? array_shift($parts) : '';
-            $last = $parts ? implode(' ', $parts) : '';
-            if ($first !== '') {
-                $meta_query = [['key'=>'_pa_first_name','value'=>$first,'compare'=>'LIKE']];
-                if ($last !== '') { $meta_query[] = ['key'=>'_pa_last_name','value'=>$last,'compare'=>'LIKE']; }
-                $matches = get_posts([
-                    'post_type'=>'pa_speaker',
-                    'post_status'=>['publish','draft'],
-                    'numberposts'=>1,
-                    'fields'=>'ids',
-                    'meta_query'=>$meta_query,
-                ]);
-                if ($matches) { return absint($matches[0]); }
-            }
+    private function import_speaker_row($row, $status, $images) {
+        $first = sanitize_text_field($row['first_name'] ?? '');
+        $last = sanitize_text_field($row['last_name'] ?? '');
+        $name = sanitize_text_field($row['speaker_name'] ?? $row['name'] ?? trim($first . ' ' . $last));
+        if ($name === '') { return false; }
+        if ($first === '' || $last === '') {
+            $parts = preg_split('/\s+/', $name);
+            if ($first === '') { $first = array_shift($parts); }
+            if ($last === '') { $last = implode(' ', $parts); }
         }
+        $speaker_id = wp_insert_post(['post_type'=>'pa_speaker','post_status'=>$status,'post_title'=>$name,'post_content'=>wp_kses_post($row['bio'] ?? '')], true);
+        if (is_wp_error($speaker_id) || !$speaker_id) { return false; }
+        update_post_meta($speaker_id, '_pa_first_name', $first);
+        update_post_meta($speaker_id, '_pa_last_name', $last);
+        update_post_meta($speaker_id, '_pa_speaker_role_title', sanitize_text_field($row['role_title'] ?? $row['title'] ?? ''));
+        update_post_meta($speaker_id, '_pa_speaker_company', sanitize_text_field($row['company'] ?? ''));
+        update_post_meta($speaker_id, '_pa_speaker_credentials', sanitize_text_field($row['credentials'] ?? ''));
+        update_post_meta($speaker_id, '_pa_speaker_website', esc_url_raw($row['website'] ?? ''));
+        update_post_meta($speaker_id, '_pa_speaker_linkedin', esc_url_raw($row['linkedin'] ?? ''));
+        $program_id = $this->find_program_id($row['program'] ?? '');
+        if ($program_id) { update_post_meta($speaker_id, '_pa_speaker_style_program_id', $program_id); }
+        if (!empty($row['headshot_image'])) { update_post_meta($speaker_id, '_pa_speaker_image_id', $this->import_image_value($row['headshot_image'], $images)); }
+        return true;
+    }
 
+    private function import_sponsor_row($row, $status, $images) {
+        $company = sanitize_text_field($row['company_name'] ?? $row['company'] ?? '');
+        if ($company === '') { return false; }
+        $sponsor_id = wp_insert_post(['post_type'=>'pa_sponsor','post_status'=>$status,'post_title'=>$company,'post_content'=>wp_kses_post($row['bio'] ?? '')], true);
+        if (is_wp_error($sponsor_id) || !$sponsor_id) { return false; }
+        $program_assignments = $this->parse_sponsor_program_assignments($row['programs'] ?? $row['program'] ?? '', $row['sponsor_levels'] ?? $row['level'] ?? '');
+        $program_ids = array_keys($program_assignments);
+        update_post_meta($sponsor_id, '_pa_sponsor_program_ids', array_values(array_map('absint', $program_ids)));
+        update_post_meta($sponsor_id, '_pa_sponsor_program_id', $program_ids ? absint($program_ids[0]) : 0);
+        update_post_meta($sponsor_id, '_pa_sponsor_program_levels', $program_assignments);
+        $all_levels = [];
+        foreach ($program_assignments as $levels) { foreach ((array)$levels as $level) { $all_levels[] = $level; } }
+        update_post_meta($sponsor_id, '_pa_sponsor_levels', array_values(array_filter(array_unique(array_map('sanitize_text_field', $all_levels)))));
+        update_post_meta($sponsor_id, '_pa_sponsor_website', esc_url_raw($row['sponsor_website'] ?? $row['website'] ?? ''));
+        if (!empty($row['logo_image'])) { update_post_meta($sponsor_id, '_pa_sponsor_logo_id', $this->import_image_value($row['logo_image'], $images)); }
+        return true;
+    }
+
+    private function parse_sponsor_program_assignments($programs_value, $levels_value) {
+        $assignments = [];
+        $program_chunks = array_filter(array_map('trim', preg_split('/[|;]+/', (string)$programs_value)));
+        $level_chunks = array_filter(array_map('trim', preg_split('/[|;]+/', (string)$levels_value)));
+        foreach ($program_chunks as $index => $chunk) {
+            $program_name = $chunk;
+            $levels = [];
+            if (strpos($chunk, ':') !== false) {
+                [$program_name, $level_part] = array_map('trim', explode(':', $chunk, 2));
+                $levels = array_filter(array_map('trim', explode(',', $level_part)));
+            } elseif (isset($level_chunks[$index])) {
+                $level_part = $level_chunks[$index];
+                if (strpos($level_part, ':') !== false) { [, $level_part] = array_map('trim', explode(':', $level_part, 2)); }
+                $levels = array_filter(array_map('trim', explode(',', $level_part)));
+            }
+            $program_id = $this->find_program_id($program_name);
+            if (!$program_id) { continue; }
+            $assignments[(string) $program_id] = array_values(array_filter(array_unique(array_map('sanitize_text_field', $levels))));
+        }
+        return $assignments;
+    }
+
+    private function find_program_id($name) {
+        $name = trim((string)$name);
+        if ($name === '') { return 0; }
+        $posts = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'title'=>$name,'numberposts'=>1]);
+        if ($posts) { return $posts[0]->ID; }
+        $posts = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1]);
+        foreach ($posts as $post) { if (strtolower($post->post_title) === strtolower($name)) { return $post->ID; } }
         return 0;
+    }
+
+    private function find_speaker_ids($value) {
+        $names = array_filter(array_map('trim', explode(',', (string)$value)));
+        $ids = [];
+        foreach ($names as $name) { $id = $this->find_post_id_by_title('pa_speaker', $name); if ($id) { $ids[] = $id; } }
+        return $ids;
+    }
+
+    private function find_sponsor_ids($value) {
+        $names = array_filter(array_map('trim', explode(',', (string)$value)));
+        $ids = [];
+        foreach ($names as $name) { $id = $this->find_post_id_by_title('pa_sponsor', $name); if ($id) { $ids[] = $id; } }
+        return $ids;
+    }
+
+    private function find_post_id_by_title($post_type, $title) {
+        $title = trim((string)$title);
+        if ($title === '') { return 0; }
+        $posts = get_posts(['post_type'=>$post_type,'post_status'=>['publish','draft'],'title'=>$title,'numberposts'=>1]);
+        if ($posts) { return $posts[0]->ID; }
+        $posts = get_posts(['post_type'=>$post_type,'post_status'=>['publish','draft'],'numberposts'=>-1]);
+        foreach ($posts as $post) { if (strtolower($post->post_title) === strtolower($title)) { return $post->ID; } }
+        return 0;
+    }
+
+    private function ensure_program_category($program_id, $category_name) {
+        $category_name = sanitize_text_field($category_name);
+        if ($program_id <= 0 || $category_name === '') { return; }
+        $cats = get_post_meta($program_id, '_pa_categories', true);
+        if (!is_array($cats)) { $cats = []; }
+        foreach ($cats as $cat) { if (isset($cat['name']) && strtolower($cat['name']) === strtolower($category_name)) { return; } }
+        $all_same = get_post_meta($program_id, '_pa_categories_all_same', true) === '1';
+        $base = $all_same && !empty($cats[0]) && is_array($cats[0]) ? $cats[0] : ['color'=>'#000000', 'icon'=>'none'];
+        $cats[] = ['name'=>$category_name, 'color'=>sanitize_hex_color($base['color'] ?? '') ?: '#000000', 'icon'=>sanitize_key($base['icon'] ?? 'none')];
+        update_post_meta($program_id, '_pa_categories', $cats);
+    }
+
+    private function normalize_import_date($value) {
+        $value = trim((string)$value);
+        if ($value === '') { return ''; }
+        if (is_numeric($value)) {
+            $unix = ((float)$value - 25569) * 86400;
+            return gmdate('Y-m-d', (int)$unix);
+        }
+        $ts = strtotime($value);
+        return $ts ? date('Y-m-d', $ts) : '';
     }
 
     private function normalize_import_time($value) {
         $value = trim((string)$value);
         if ($value === '') { return ''; }
-
-        // Excel stores times as fractions of a day: 0.375 = 09:00.
-        if (is_numeric($value)) {
-            $float = (float) $value;
-            if ($float >= 0 && $float < 1) {
-                $total_minutes = (int) round($float * 24 * 60);
-                $hours = floor($total_minutes / 60) % 24;
-                $minutes = $total_minutes % 60;
-                return sprintf('%02d:%02d', $hours, $minutes);
-            }
-            // Excel date+time serial. Keep only the time portion.
-            if ($float >= 1) {
-                $fraction = $float - floor($float);
-                if ($fraction > 0) {
-                    $total_minutes = (int) round($fraction * 24 * 60);
-                    $hours = floor($total_minutes / 60) % 24;
-                    $minutes = $total_minutes % 60;
-                    return sprintf('%02d:%02d', $hours, $minutes);
-                }
-            }
-        }
-
-        $value = preg_replace('/\s+/', ' ', $value);
-        if (preg_match('/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/', $value, $m)) {
-            return sprintf('%02d:%02d', (int)$m[1], (int)$m[2]);
+        if (is_numeric($value) && (float)$value < 1) {
+            $seconds = round((float)$value * 86400);
+            return gmdate('H:i', $seconds);
         }
         $ts = strtotime($value);
         return $ts ? date('H:i', $ts) : '';
     }
 
-    /**
-     * Import images from a public URL or from the ZIP package's top-level images/ folder.
-     */
-    private function import_image_to_media($value, $images = []) {
+    private function import_image_value($value, $images) {
         $value = trim((string)$value);
         if ($value === '') { return 0; }
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        require_once ABSPATH . 'wp-admin/includes/media.php';
-        require_once ABSPATH . 'wp-admin/includes/image.php';
-        if (preg_match('#^https?://#i', $value)) {
-            $id = media_sideload_image(esc_url_raw($value), 0, null, 'id');
-            return is_wp_error($id) ? 0 : absint($id);
-        }
-        $path = $images[strtolower(basename($value))] ?? '';
-        if ($path && file_exists($path)) {
-            $copy = wp_tempnam(basename($path));
-            if (!$copy || !copy($path, $copy)) { return 0; }
-            $file_array = ['name'=>basename($path), 'tmp_name'=>$copy];
-            $id = media_handle_sideload($file_array, 0);
-            if (is_wp_error($id)) { @unlink($copy); return 0; }
-            return absint($id);
-        }
+        $lower = strtolower(basename($value));
+        if (isset($images[$lower])) { return $this->sideload_image($images[$lower]); }
+        if (filter_var($value, FILTER_VALIDATE_URL)) { return $this->sideload_image($value); }
         return 0;
     }
 
-    private function import_speaker_row($row, $status, $images = []) {
-        $name = sanitize_text_field($row['speaker_name'] ?? '');
-        $first = sanitize_text_field($row['first_name'] ?? '');
-        $last = sanitize_text_field($row['last_name'] ?? '');
-        if (!$name) { $name = trim($first . ' ' . $last); }
-        if (!$name) { return false; }
-        if (!$first && !$last) { $parts = preg_split('/\s+/', $name); $first = array_shift($parts); $last = implode(' ', $parts); }
-        $id = wp_insert_post(['post_type'=>'pa_speaker','post_title'=>$name,'post_content'=>wp_kses_post($row['bio'] ?? ''),'post_status'=>$status], true);
-        if (is_wp_error($id)) { return false; }
-        update_post_meta($id, '_pa_first_name', $first);
-        update_post_meta($id, '_pa_last_name', $last);
-        update_post_meta($id, '_pa_speaker_role_title', sanitize_text_field($row['role_title'] ?? $row['role'] ?? ''));
-        update_post_meta($id, '_pa_speaker_company', sanitize_text_field($row['company'] ?? ''));
-        update_post_meta($id, '_pa_speaker_credentials', sanitize_text_field($row['credentials'] ?? ''));
-        update_post_meta($id, '_pa_speaker_website', esc_url_raw($row['website'] ?? ''));
-        update_post_meta($id, '_pa_speaker_linkedin', esc_url_raw($row['linkedin'] ?? ''));
-        $program_id = $this->find_program_id_by_import_value($row['program'] ?? '');
-        if ($program_id) { update_post_meta($id, '_pa_speaker_style_program_id', $program_id); }
-        $image_id = $this->import_image_to_media($row['headshot_image'] ?? $row['image'] ?? '', $images);
-        if ($image_id) { update_post_meta($id, '_pa_speaker_image_id', $image_id); }
-        return true;
+    private function sideload_image($source) {
+        if (!function_exists('media_handle_sideload')) { require_once ABSPATH . 'wp-admin/includes/media.php'; require_once ABSPATH . 'wp-admin/includes/file.php'; require_once ABSPATH . 'wp-admin/includes/image.php'; }
+        if (filter_var($source, FILTER_VALIDATE_URL)) {
+            $tmp = download_url($source);
+            if (is_wp_error($tmp)) { return 0; }
+            $name = basename(parse_url($source, PHP_URL_PATH));
+        } else {
+            $tmp = $source;
+            $name = basename($source);
+        }
+        $file = ['name'=>$name, 'tmp_name'=>$tmp];
+        $id = media_handle_sideload($file, 0);
+        if (is_wp_error($id)) { if (file_exists($tmp)) { @unlink($tmp); } return 0; }
+        return $id;
     }
 
-    private function import_sponsor_row($row, $status, $images = []) {
-        $company = sanitize_text_field($row['company_name'] ?? $row['company'] ?? '');
-        if (!$company) { return false; }
-        $id = wp_insert_post(['post_type'=>'pa_sponsor','post_title'=>$company,'post_content'=>wp_kses_post($row['bio'] ?? ''),'post_status'=>$status], true);
-        if (is_wp_error($id)) { return false; }
-        update_post_meta($id, '_pa_sponsor_website', esc_url_raw($row['sponsor_website'] ?? $row['website'] ?? ''));
-        $logo_id = $this->import_image_to_media($row['logo_image'] ?? $row['logo'] ?? '', $images);
-        if ($logo_id) { update_post_meta($id, '_pa_sponsor_logo_id', $logo_id); }
-        $program_ids = [];
-        foreach ($this->split_import_list($row['programs'] ?? $row['program'] ?? '') as $program_value) {
-            $program_id = $this->find_program_id_by_import_value($program_value);
-            if ($program_id) { $program_ids[] = $program_id; }
-        }
-        $program_ids = array_values(array_unique($program_ids));
-        update_post_meta($id, '_pa_sponsor_program_ids', $program_ids);
-        update_post_meta($id, '_pa_sponsor_program_id', $program_ids ? $program_ids[0] : 0);
-        $level_map = [];
-        $all_levels = [];
-        $raw_levels = (string)($row['sponsor_levels'] ?? $row['levels'] ?? '');
-        foreach ($this->split_import_list($raw_levels) as $chunk) {
-            $program_name = ''; $level = $chunk;
-            if (strpos($chunk, ':') !== false) { [$program_name, $level] = array_map('trim', explode(':', $chunk, 2)); }
-            $level = sanitize_text_field($level);
-            if ($level === '') { continue; }
-            if ($program_name) { $pid = $this->find_program_id_by_import_value($program_name); }
-            else { $pid = $program_ids[0] ?? 0; }
-            if ($pid) { $level_map[(string)$pid][] = $level; }
-            if (!in_array($level, $all_levels, true)) { $all_levels[] = $level; }
-        }
-        update_post_meta($id, '_pa_sponsor_program_levels', $level_map);
-        update_post_meta($id, '_pa_sponsor_levels', $all_levels);
-        return true;
-    }
-
-    private function import_event_row($row, $status, $images = []) {
-        $title = sanitize_text_field($row['event_title'] ?? $row['title'] ?? '');
-        if (!$title) { return false; }
-        $program_id = $this->find_program_id_by_import_value($row['program'] ?? '');
-        if (!$program_id) { return false; }
-        $id = wp_insert_post(['post_type'=>'pa_event','post_title'=>$title,'post_content'=>wp_kses_post($row['description'] ?? $row['event_description'] ?? ''),'post_status'=>$status], true);
-        if (is_wp_error($id)) { return false; }
-        update_post_meta($id, '_pa_program_id', $program_id);
-        update_post_meta($id, '_pa_event_category', sanitize_text_field($row['category'] ?? ''));
-        update_post_meta($id, '_pa_event_date', sanitize_text_field($row['date'] ?? $row['event_date'] ?? ''));
-        update_post_meta($id, '_pa_event_time', $this->normalize_import_time($row['start_time'] ?? $row['event_time'] ?? $row['time'] ?? ''));
-        update_post_meta($id, '_pa_event_end_time', $this->normalize_import_time($row['end_time'] ?? $row['event_end_time'] ?? ''));
-        update_post_meta($id, '_pa_event_location', sanitize_text_field($row['location'] ?? ''));
-        update_post_meta($id, '_pa_event_location_link', esc_url_raw($row['location_link'] ?? ''));
-        $header_image_id = $this->import_image_to_media($row['header_image'] ?? $row['event_header_image'] ?? $row['event_image'] ?? '', $images);
-        if ($header_image_id) { update_post_meta($id, '_pa_event_image_id', $header_image_id); }
-        $speaker_ids = [];
-        foreach ($this->split_import_list($row['speakers'] ?? $row['speaker_names'] ?? $row['speaker'] ?? '') as $speaker_name) { $sid = $this->find_pa_post_by_import_value($speaker_name, 'pa_speaker'); if ($sid) { $speaker_ids[] = $sid; } }
-        update_post_meta($id, '_pa_speaker_ids', array_values(array_unique($speaker_ids)));
-        $sponsor_ids = [];
-        foreach ($this->split_import_list($row['sponsors'] ?? $row['sponsor_names'] ?? $row['sponsor'] ?? '') as $sponsor_name) { $sid = $this->find_pa_post_by_import_value($sponsor_name, 'pa_sponsor'); if ($sid) { $sponsor_ids[] = $sid; } }
-        update_post_meta($id, '_pa_sponsor_ids', array_values(array_unique($sponsor_ids)));
-        update_post_meta($id, '_pa_event_invite_only', !empty($row['invite_only']) && in_array(strtolower($row['invite_only']), ['1','yes','true'], true) ? '1' : '0');
-        return true;
-    }
-
-
-    private function sanitize_settings($raw) {
-        $s = [];
-        foreach (['header_bg','content_bg','header_color','content_color','image_border_color','directory_image_border_color'] as $k) { $s[$k] = sanitize_hex_color($raw[$k] ?? '') ?: ''; }
-        $s['image_shape'] = in_array(($raw['image_shape'] ?? ''), ['','square','circle'], true) ? $raw['image_shape'] : '';
-        $s['image_border_width'] = isset($raw['image_border_width']) && $raw['image_border_width'] !== '' ? absint($raw['image_border_width']) : 0;
-        $s['directory_image_shape'] = in_array(($raw['directory_image_shape'] ?? ''), ['','square','circle'], true) ? $raw['directory_image_shape'] : '';
-        $s['directory_image_border_width'] = isset($raw['directory_image_border_width']) && $raw['directory_image_border_width'] !== '' ? absint($raw['directory_image_border_width']) : 0;
-        foreach (['header_border','content_border'] as $key) {
-            $v = (array)($raw[$key] ?? []);
-            $lock_radius = !empty($v['lock_radius']) ? 1 : 0;
-            $lock_width = !empty($v['lock_width']) ? 1 : 0;
-            $s[$key] = [
-                'lock_radius' => $lock_radius,
-                'lock_width' => $lock_width,
-                'color' => sanitize_hex_color($v['color'] ?? '') ?: '',
-            ];
-
-            $radius_values = [];
-            foreach (['tl','tr','br','bl'] as $c) {
-                $raw_value = $v['radius_'.$c] ?? '';
-                $radius_values[$c] = ($raw_value !== '') ? absint($raw_value) : 0;
-            }
-            if ($lock_radius) {
-                $locked_radius = 0;
-                foreach (['tl','tr','br','bl'] as $c) {
-                    if (isset($radius_values[$c])) { $locked_radius = $radius_values[$c]; break; }
-                }
-                foreach (['tl','tr','br','bl'] as $c) { $radius_values[$c] = $locked_radius; }
-            }
-            foreach (['tl','tr','br','bl'] as $c) { $s[$key]['radius_'.$c] = $radius_values[$c]; }
-
-            $width_values = [];
-            foreach (['top','right','bottom','left'] as $c) {
-                $raw_value = $v['width_'.$c] ?? '';
-                $width_values[$c] = ($raw_value !== '') ? absint($raw_value) : 0;
-            }
-            if ($lock_width) {
-                $locked_width = 0;
-                foreach (['top','right','bottom','left'] as $c) {
-                    if (isset($width_values[$c])) { $locked_width = $width_values[$c]; break; }
-                }
-                foreach (['top','right','bottom','left'] as $c) { $width_values[$c] = $locked_width; }
-            }
-            foreach (['top','right','bottom','left'] as $c) { $s[$key]['width_'.$c] = $width_values[$c]; }
-        }
-        return $s;
+    private function cleanup_import_temp_dir($dir) {
+        if (!$dir || !is_dir($dir)) { return; }
+        $files = scandir($dir);
+        if ($files) { foreach ($files as $file) { if ($file !== '.' && $file !== '..') { @unlink($dir . '/' . $file); } } }
+        @rmdir($dir);
     }
 
     public function duplicate_item() {
@@ -2506,1344 +2100,668 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         if (!$post || !in_array($post->post_type, ['pa_event','pa_speaker','pa_sponsor'], true) || !current_user_can('edit_post', $id)) {
             wp_die(esc_html__('You are not allowed to duplicate this item.', 'program-agenda'));
         }
-        $new_id = wp_insert_post([
+        $copy_id = wp_insert_post([
             'post_type' => $post->post_type,
+            'post_status' => 'draft',
             'post_title' => $post->post_title . ' Copy',
             'post_content' => $post->post_content,
-            'post_status' => 'draft',
             'post_author' => get_current_user_id(),
         ], true);
-        $new_id = $this->ensure_saved_post_id($new_id);
+        $copy_id = $this->ensure_saved_post_id($copy_id);
         $meta = get_post_meta($id);
-        foreach ($meta as $key => $values) {
-            foreach ((array)$values as $value) { add_post_meta($new_id, $key, maybe_unserialize($value)); }
+        foreach ($meta as $key=>$values) {
+            if (strpos($key, '_pa_') !== 0) { continue; }
+            foreach ($values as $value) { add_post_meta($copy_id, $key, maybe_unserialize($value)); }
         }
         $page = $post->post_type === 'pa_event' ? 'program-edit-event' : ($post->post_type === 'pa_speaker' ? 'program-edit-speaker' : 'program-edit-sponsor');
-        wp_safe_redirect(admin_url('admin.php?page=' . $page . '&id=' . $new_id . '&duplicated=1')); exit;
+        wp_safe_redirect(admin_url('admin.php?page=' . $page . '&id=' . $copy_id . '&saved=1')); exit;
     }
 
-    public function bulk_items() {
-        $post_type = sanitize_key($_POST['post_type'] ?? '');
-        if (!in_array($post_type, ['pa_event','pa_sponsor'], true)) {
-            wp_die(esc_html__('Unsupported bulk action.', 'program-agenda'));
+    private function require_edit_pa_post($post_type, $id = 0) {
+        if (!current_user_can('edit_posts')) {
+            wp_die(esc_html__('You are not allowed to edit this content.', 'program-agenda'));
         }
-        check_admin_referer('pa_bulk_items_' . $post_type);
-        $ids = array_values(array_filter(array_map('absint', (array)($_POST['item_ids'] ?? []))));
-        $bulk_action = sanitize_key($_POST['bulk_action'] ?? '');
-        $program_id = absint($_POST['bulk_program_id'] ?? 0);
-        $level = sanitize_text_field($_POST['bulk_sponsor_level'] ?? '');
-        $redirect_page = $post_type === 'pa_event' ? 'program-events' : 'program-sponsors';
-        $redirect = admin_url('admin.php?page=' . $redirect_page);
-
-        if (!$ids || ($bulk_action && !in_array($bulk_action, ['draft','delete'], true))) {
-            wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
-        }
-        if (!$bulk_action && !$program_id) {
-            wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
-        }
-        if ($level && (!$program_id || $post_type !== 'pa_sponsor')) {
-            wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
-        }
-        if ($program_id && get_post_type($program_id) !== 'pa_program') {
-            wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
-        }
-
-        if ($bulk_action === 'delete') {
-            foreach ($ids as $id) {
-                $post = get_post($id);
-                if ($post && $post->post_type === $post_type && current_user_can('delete_post', $id)) {
-                    wp_delete_post($id, true);
-                }
-            }
-            wp_safe_redirect(add_query_arg('bulk_deleted', count($ids), $redirect)); exit;
-        }
-
-        $updated = 0;
-        foreach ($ids as $id) {
+        if ($id) {
             $post = get_post($id);
-            if (!$post || $post->post_type !== $post_type || !current_user_can('edit_post', $id)) { continue; }
-
-            if ($bulk_action === 'draft') {
-                $result = wp_update_post(['ID' => $id, 'post_status' => 'draft'], true);
-                if (is_wp_error($result)) { continue; }
+            if (!$post || $post->post_type !== $post_type || !current_user_can('edit_post', $id)) {
+                wp_die(esc_html__('You are not allowed to edit this item.', 'program-agenda'));
             }
-
-            if ($program_id) {
-                if ($post_type === 'pa_event') {
-                    update_post_meta($id, '_pa_program_id', $program_id);
-                } else {
-                    $program_ids = $this->sponsor_program_ids($id);
-                    if (!in_array($program_id, $program_ids, true)) { $program_ids[] = $program_id; }
-                    update_post_meta($id, '_pa_sponsor_program_ids', array_values(array_unique(array_map('absint', $program_ids))));
-                    if (!absint(get_post_meta($id, '_pa_sponsor_program_id', true))) { update_post_meta($id, '_pa_sponsor_program_id', $program_id); }
-                    if ($level !== '') {
-                        $program_levels = get_post_meta($id, '_pa_sponsor_program_levels', true);
-                        if (!is_array($program_levels)) { $program_levels = []; }
-                        $program_key = (string) $program_id;
-                        $current = isset($program_levels[$program_key]) && is_array($program_levels[$program_key]) ? $program_levels[$program_key] : [];
-                        if (!$current && isset($program_levels[$program_id]) && is_array($program_levels[$program_id])) { $current = $program_levels[$program_id]; }
-                        $current[] = $level;
-                        $program_levels[$program_key] = array_values(array_filter(array_unique(array_map('sanitize_text_field', $current))));
-                        if (isset($program_levels[$program_id]) && $program_id !== $program_key) { unset($program_levels[$program_id]); }
-                        update_post_meta($id, '_pa_sponsor_program_levels', $program_levels);
-
-                        $legacy_levels = get_post_meta($id, '_pa_sponsor_levels', true);
-                        if (!is_array($legacy_levels)) { $legacy_levels = []; }
-                        $legacy_levels[] = $level;
-                        update_post_meta($id, '_pa_sponsor_levels', array_values(array_filter(array_unique(array_map('sanitize_text_field', $legacy_levels)))));
-                    }
-                }
-            }
-            $updated++;
         }
+    }
 
-        if ($bulk_action === 'draft') {
-            wp_safe_redirect(add_query_arg('bulk_drafted', $updated, $redirect)); exit;
+    private function ensure_saved_post_id($result) {
+        if (is_wp_error($result) || !$result) {
+            wp_die(esc_html__('Could not save. Please try again.', 'program-agenda'));
         }
-        wp_safe_redirect(add_query_arg('bulk_updated', $updated, $redirect)); exit;
+        return (int)$result;
     }
 
-    public function delete_item() {
-        $id = absint($_GET['id'] ?? 0);
-        check_admin_referer('pa_delete_item_' . $id);
-        $post = get_post($id);
-        if (!$post || !in_array($post->post_type, ['pa_program','pa_event','pa_speaker','pa_sponsor'], true) || !current_user_can('delete_post', $id)) {
-            wp_die(esc_html__('You are not allowed to delete this item.', 'program-agenda'));
+    private function settings_for_program($program_id, $type) {
+        $meta = $type === 'speaker' ? self::META_SPEAKER_SETTINGS : self::META_EVENT_SETTINGS;
+        $saved = $program_id ? get_post_meta($program_id, $meta, true) : [];
+        if (!is_array($saved) || !$saved) { $saved = get_option($type === 'speaker' ? self::OPT_SPEAKER : self::OPT_EVENT, []); }
+        return is_array($saved) ? $saved : [];
+    }
+
+    private function sanitize_settings($in) {
+        $in = is_array($in) ? $in : [];
+        $out = [];
+        foreach (['header_bg','header_color','content_bg','content_color','image_border_color','directory_image_border_color'] as $k) { $out[$k] = sanitize_hex_color($in[$k] ?? '') ?: ''; }
+        foreach (['header_border','content_border'] as $border_key) {
+            $out[$border_key] = $this->sanitize_border_group($in[$border_key] ?? []);
         }
-        wp_delete_post($id, true);
-        wp_safe_redirect(add_query_arg('deleted', '1', wp_get_referer() ?: admin_url('admin.php?page=program-main'))); exit;
+        $out['image_shape'] = in_array(($in['image_shape'] ?? ''), ['','square','circle'], true) ? $in['image_shape'] : '';
+        $out['image_border_width'] = max(0, intval($in['image_border_width'] ?? 0));
+        $out['directory_image_shape'] = in_array(($in['directory_image_shape'] ?? ''), ['','square','circle'], true) ? $in['directory_image_shape'] : '';
+        $out['directory_image_border_width'] = max(0, intval($in['directory_image_border_width'] ?? 0));
+        return $out;
     }
 
-    private function program_shortcode_id($program_id) {
-        $post = get_post($program_id);
-        if (!$post || $post->post_type !== 'pa_program') { return ''; }
-        $slug = $post->post_name ?: sanitize_title($post->post_title);
-        return $slug ?: (string) absint($program_id);
-    }
-
-    private function resolve_program_shortcode_id($value) {
-        $value = trim((string)$value);
-        if ($value === '') { return 0; }
-        if (ctype_digit($value)) { return absint($value); }
-
-        $slug = sanitize_title($value);
-        $program = get_page_by_path($slug, OBJECT, 'pa_program');
-        if ($program && $program->post_type === 'pa_program') { return absint($program->ID); }
-
-        $matches = get_posts([
-            'post_type' => 'pa_program',
-            'post_status' => ['publish','draft'],
-            'title' => $value,
-            'numberposts' => 1,
-            'fields' => 'ids',
-        ]);
-        return !empty($matches[0]) ? absint($matches[0]) : 0;
-    }
-
-    private function format_program_date_part($date, $format = 'full') {
-        if (!$date) { return ''; }
-        $ts = strtotime($date);
-        if (!$ts) { return $date; }
-        if ($format === 'numeric') { return date_i18n('n/j', $ts); }
-        if ($format === 'abbrev') { return date_i18n('M. j', $ts); }
-        return date_i18n('F j', $ts);
-    }
-
-    private function program_dates_label($start, $end, $additional = []) {
-        $parts = [];
-        if ($start || $end) {
-            $parts[] = trim($this->format_program_date_part($start, 'full') . (($start && $end) ? ' – ' : '') . $this->format_program_date_part($end, 'full'));
+    private function sanitize_border_group($input) {
+        if (!is_array($input)) { $input = []; }
+        $out = [];
+        $out['color'] = sanitize_hex_color($input['color'] ?? '') ?: '';
+        $out['lock_radius'] = !empty($input['lock_radius']) ? '1' : '0';
+        $out['lock_width'] = !empty($input['lock_width']) ? '1' : '0';
+        foreach (['tl','tr','br','bl'] as $key) {
+            $out['radius_' . $key] = max(0, intval($input['radius_' . $key] ?? 0));
         }
-        foreach ((array)$additional as $range) {
-            $a = is_array($range) ? ($range['start'] ?? '') : '';
-            $b = is_array($range) ? ($range['end'] ?? '') : '';
-            if ($a || $b) { $parts[] = trim($this->format_program_date_part($a, 'full') . (($a && $b) ? ' – ' : '') . $this->format_program_date_part($b, 'full')); }
+        foreach (['top','right','bottom','left'] as $key) {
+            $out['width_' . $key] = max(0, intval($input['width_' . $key] ?? 0));
         }
-        return implode(', ', array_filter($parts));
+        return $out;
     }
 
-    private function format_agenda_date($date, $display = 'numeric') {
-        if (!$date) { return ''; }
-        $ts = strtotime($date);
-        if (!$ts) { return $date; }
-        if ($display === 'abbrev' || $display === 'full') { return date_i18n('M. j', $ts); }
-        return date_i18n('n/j', $ts);
+    private function inline_header_style($s) {
+        $style = '';
+        if (!empty($s['header_bg'])) { $style .= 'background-color:' . esc_attr($s['header_bg']) . ';'; }
+        if (!empty($s['header_color'])) { $style .= 'color:' . esc_attr($s['header_color']) . ';'; }
+        if (!empty($s['header_border'])) { $style .= $this->border_style_from_group($s['header_border'], 'border'); }
+        return $style;
     }
 
-    private function agenda_day_key($date) {
-        $date = is_string($date) ? trim($date) : '';
-        if ($date === '') { return 'unscheduled'; }
-
-        $ts = strtotime($date);
-        if ($ts) { return date_i18n('Y-m-d', $ts); }
-
-        return sanitize_title($date);
+    private function inline_content_style($s) {
+        $style = '';
+        if (!empty($s['content_bg'])) { $style .= 'background-color:' . esc_attr($s['content_bg']) . ';'; }
+        if (!empty($s['content_color'])) { $style .= 'color:' . esc_attr($s['content_color']) . ';'; }
+        if (!empty($s['content_border'])) { $style .= $this->border_style_from_group($s['content_border'], 'border'); }
+        return $style;
     }
 
-    private function agenda_event_sort_value($event) {
-        $date = get_post_meta($event->ID, '_pa_event_date', true);
-        $time = get_post_meta($event->ID, '_pa_event_start_time', true);
-        if (!$time) { $time = get_post_meta($event->ID, '_pa_event_time', true); }
-        $raw = trim(($date ?: '') . ' ' . ($time ?: ''));
-        $ts = $raw ? strtotime($raw) : false;
-        if ($ts) { return $ts; }
-        $date_ts = $date ? strtotime($date) : false;
-        return $date_ts ?: PHP_INT_MAX;
+    private function preview_image_style($s) {
+        $style = '';
+        $shape = $s['image_shape'] ?? '';
+        if ($shape === 'circle') { $style .= 'border-radius:999px;'; }
+        elseif ($shape === 'square') { $style .= 'border-radius:0;'; }
+        if (!empty($s['image_border_width'])) { $style .= 'border-width:' . intval($s['image_border_width']) . 'px;border-style:solid;'; }
+        if (!empty($s['image_border_color'])) { $style .= 'border-color:' . esc_attr($s['image_border_color']) . ';'; }
+        return $style;
+    }
+
+    private function border_style_from_group($border, $prop = 'border') {
+        if (!is_array($border)) { return ''; }
+        $color = sanitize_hex_color($border['color'] ?? '') ?: '';
+        $parts = '';
+        $widths = [];
+        foreach (['top','right','bottom','left'] as $side) { $widths[$side] = max(0, intval($border['width_' . $side] ?? 0)); }
+        $radii = [];
+        foreach (['tl','tr','br','bl'] as $corner) { $radii[$corner] = max(0, intval($border['radius_' . $corner] ?? 0)); }
+        if (array_sum($widths) > 0) {
+            foreach ($widths as $side=>$width) { $parts .= 'border-' . $side . '-width:' . $width . 'px;border-' . $side . '-style:solid;'; }
+            if ($color) { $parts .= 'border-color:' . esc_attr($color) . ';'; }
+        }
+        if (array_sum($radii) > 0) {
+            $parts .= 'border-radius:' . $radii['tl'] . 'px ' . $radii['tr'] . 'px ' . $radii['br'] . 'px ' . $radii['bl'] . 'px;';
+        }
+        return $parts;
+    }
+
+    private function style_attr_from_settings($s, $part) {
+        if (!is_array($s)) { return ''; }
+        $style = $part === 'header' ? $this->inline_header_style($s) : $this->inline_content_style($s);
+        return $style ? ' style="' . esc_attr($style) . '"' : '';
+    }
+
+    private function speaker_image_style_attr($s, $context = 'single') {
+        if (!is_array($s)) { $s = []; }
+        $shape_key = $context === 'directory' ? 'directory_image_shape' : 'image_shape';
+        $width_key = $context === 'directory' ? 'directory_image_border_width' : 'image_border_width';
+        $color_key = $context === 'directory' ? 'directory_image_border_color' : 'image_border_color';
+        $style = '';
+        $shape = $s[$shape_key] ?? '';
+        if ($shape === 'circle') { $style .= 'border-radius:999px;'; }
+        elseif ($shape === 'square') { $style .= 'border-radius:0;'; }
+        $width = max(0, intval($s[$width_key] ?? 0));
+        if ($width > 0) { $style .= 'border-width:' . $width . 'px;border-style:solid;'; }
+        $color = sanitize_hex_color($s[$color_key] ?? '') ?: '';
+        if ($color) { $style .= 'border-color:' . esc_attr($color) . ';'; }
+        return $style ? ' style="' . esc_attr($style) . '"' : '';
     }
 
     public function shortcode_program_agenda($atts) {
-        $atts = shortcode_atts(['id'=>''], $atts, 'program_agenda');
+        $atts = shortcode_atts(['id'=>0], $atts, 'program_agenda');
         $program_id = $this->resolve_program_shortcode_id($atts['id']);
-        $program = get_post($program_id);
-        if (!$program || $program->post_type !== 'pa_program') { return ''; }
+        if (!$program_id) { return '<p>Program not found.</p>'; }
+        $settings = get_post_meta($program_id, '_pa_agenda_settings', true);
+        if (!is_array($settings)) { $settings = []; }
+        $card_size = $this->normalize_agenda_card_size($settings['card_size'] ?? 'full');
+        $show = get_post_meta($program_id, '_pa_show_event_descriptions', true) === 'show';
+        $date_display = in_array(($settings['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? $settings['date_display'] : 'numeric';
+        $display_mode = ($settings['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs';
         $events = get_posts(['post_type'=>'pa_event','post_status'=>'publish','numberposts'=>-1,'meta_key'=>'_pa_event_date','orderby'=>'meta_value','order'=>'ASC','meta_query'=>[['key'=>'_pa_program_id','value'=>$program_id,'compare'=>'=']]]);
-        $agenda = get_post_meta($program_id, '_pa_agenda_settings', true); if (!is_array($agenda)) { $agenda = []; }
-        $show_desc = ($agenda['show_descriptions'] ?? get_post_meta($program_id, '_pa_show_event_descriptions', true) ?: 'hide') !== 'hide';
-        $display_mode = ($agenda['display_mode'] ?? 'tabs') === 'stacked' ? 'stacked' : 'tabs';
-        $date_display = $agenda['date_display'] ?? 'numeric';
-        if (!in_array($date_display, ['numeric','abbrev'], true)) { $date_display = 'numeric'; }
-        $card_size = $this->normalize_agenda_card_size($agenda['card_size'] ?? 'full');
-        $agenda_style = $this->agenda_item_style($agenda);
-        $cats = get_post_meta($program_id, '_pa_categories', true); if (!is_array($cats)) { $cats = []; }
-        $cat_map = []; foreach ($cats as $c) { $cat_map[$c['name']] = $c; }
+        $by_date = [];
+        foreach ($events as $event) {
+            $date = get_post_meta($event->ID, '_pa_event_date', true) ?: '';
+            $key = $date ? date('Y-m-d', strtotime($date)) : 'unscheduled';
+            if (!isset($by_date[$key])) { $by_date[$key] = []; }
+            $by_date[$key][] = $event;
+        }
+        ksort($by_date);
+        $style = '';
+        if (!empty($settings['background'])) { $style .= '--pa-agenda-bg:' . esc_attr($settings['background']) . ';'; }
+        if (!empty($settings['accent_bar_color'])) { $style .= '--pa-agenda-bar-color:' . esc_attr($settings['accent_bar_color']) . ';'; }
+        if (!empty($settings['title_color'])) { $style .= '--pa-agenda-title-color:' . esc_attr($settings['title_color']) . ';'; }
+        if (!empty($settings['location_color'])) { $style .= '--pa-agenda-location-color:' . esc_attr($settings['location_color']) . ';'; }
+        if (!empty($settings['tab_background_color'])) { $style .= '--pa-agenda-tab-bg:' . esc_attr($settings['tab_background_color']) . ';'; }
+        if (!empty($settings['tab_border_color'])) { $style .= '--pa-agenda-tab-border-color:' . esc_attr($settings['tab_border_color']) . ';'; }
+        if (!empty($settings['border_color'])) { $style .= '--pa-agenda-card-border:' . esc_attr($settings['border_color']) . ';'; }
+        $style .= $this->css_vars_for_border($settings, 'border', 'pa-agenda-card');
+        $style .= $this->css_vars_for_border($settings, 'tab_border', 'pa-agenda-tab');
         ob_start();
-        $schedule_style = '';
-        $tab_style = '';
-        $tab_bg_color = $agenda['tab_background_color'] ?? ($agenda['background'] ?? '');
-        if (!empty($tab_bg_color)) { $tab_style .= '--pa-agenda-tab-bg:' . esc_attr($tab_bg_color) . ';'; }
-        if (!empty($agenda['tab_border_color'])) { $tab_style .= '--pa-agenda-tab-border-color:' . esc_attr($agenda['tab_border_color']) . ';'; }
-        $tab_border = isset($agenda['tab_border']) && is_array($agenda['tab_border']) ? $agenda['tab_border'] : [];
-        if (!$tab_border && isset($agenda['tab_border_width'])) {
-            $legacy_width = absint($agenda['tab_border_width']);
-            $legacy_radius = isset($agenda['tab_border_radius']) ? absint($agenda['tab_border_radius']) : 999;
-            $tab_border = [
-                'width_top' => $legacy_width,
-                'width_right' => $legacy_width,
-                'width_bottom' => $legacy_width,
-                'width_left' => $legacy_width,
-                'radius_tl' => $legacy_radius,
-                'radius_tr' => $legacy_radius,
-                'radius_br' => $legacy_radius,
-                'radius_bl' => $legacy_radius,
-            ];
-        }
-        $tab_style .= '--pa-agenda-tab-border-width-top:' . absint($tab_border['width_top'] ?? 1) . 'px;';
-        $tab_style .= '--pa-agenda-tab-border-width-right:' . absint($tab_border['width_right'] ?? 1) . 'px;';
-        $tab_style .= '--pa-agenda-tab-border-width-bottom:' . absint($tab_border['width_bottom'] ?? 1) . 'px;';
-        $tab_style .= '--pa-agenda-tab-border-width-left:' . absint($tab_border['width_left'] ?? 1) . 'px;';
-        $tab_style .= '--pa-agenda-tab-radius-tl:' . absint($tab_border['radius_tl'] ?? 999) . 'px;';
-        $tab_style .= '--pa-agenda-tab-radius-tr:' . absint($tab_border['radius_tr'] ?? 999) . 'px;';
-        $tab_style .= '--pa-agenda-tab-radius-br:' . absint($tab_border['radius_br'] ?? 999) . 'px;';
-        $tab_style .= '--pa-agenda-tab-radius-bl:' . absint($tab_border['radius_bl'] ?? 999) . 'px;';
-        $tab_text_color = $agenda['title_color'] ?? ($agenda['color'] ?? '');
-        if (!empty($tab_text_color)) { $tab_style .= '--pa-agenda-tab-color:' . esc_attr($tab_text_color) . ';'; }
-
-        $tab_has_any_border_width = (absint($tab_border['width_top'] ?? 1) || absint($tab_border['width_right'] ?? 1) || absint($tab_border['width_bottom'] ?? 1) || absint($tab_border['width_left'] ?? 1));
-        $tab_button_style = $tab_style;
-        if (!$tab_has_any_border_width) {
-            $tab_button_style .= 'border:0!important;border-width:0!important;border-style:none!important;';
-        } else {
-            $tab_button_style .= 'border-style:solid!important;';
-            $tab_button_style .= 'border-color:' . esc_attr($agenda['tab_border_color'] ?: 'transparent') . '!important;';
-            $tab_button_style .= 'border-top-width:' . absint($tab_border['width_top'] ?? 1) . 'px!important;';
-            $tab_button_style .= 'border-right-width:' . absint($tab_border['width_right'] ?? 1) . 'px!important;';
-            $tab_button_style .= 'border-bottom-width:' . absint($tab_border['width_bottom'] ?? 1) . 'px!important;';
-            $tab_button_style .= 'border-left-width:' . absint($tab_border['width_left'] ?? 1) . 'px!important;';
-        }
-        $tab_button_style .= 'border-top-left-radius:' . absint($tab_border['radius_tl'] ?? 999) . 'px!important;';
-        $tab_button_style .= 'border-top-right-radius:' . absint($tab_border['radius_tr'] ?? 999) . 'px!important;';
-        $tab_button_style .= 'border-bottom-right-radius:' . absint($tab_border['radius_br'] ?? 999) . 'px!important;';
-        $tab_button_style .= 'border-bottom-left-radius:' . absint($tab_border['radius_bl'] ?? 999) . 'px!important;';
-        $tab_button_style .= 'box-shadow:none!important;outline:0!important;';
-
-        echo '<section class="pa-schedule" style="' . esc_attr($schedule_style) . '">';
-        echo '<div class="pa-agenda-content">';
-        $render_agenda_event = function($event) use ($program_id) {
-            echo $this->agenda_event_card($event, $program_id);
-        };
-
-        if ($events && $display_mode === 'tabs') {
-            usort($events, function($a, $b) {
-                $cmp = $this->agenda_event_sort_value($a) <=> $this->agenda_event_sort_value($b);
-                if ($cmp !== 0) { return $cmp; }
-                return strcasecmp($a->post_title, $b->post_title);
-            });
-            $groups = [];
-            foreach ($events as $event) {
-                $event_date_raw = get_post_meta($event->ID, '_pa_event_date', true);
-                $key = $this->agenda_day_key($event_date_raw);
-                if (!isset($groups[$key])) { $groups[$key] = []; }
-                $groups[$key][] = $event;
-            }
-            $uid = 'pa-day-tabs-' . absint($program_id);
-            echo '<div class="pa-agenda-day-tabs' . ($tab_has_any_border_width ? '' : ' pa-agenda-tabs-no-border') . '" style="' . esc_attr($tab_style) . '" data-pa-day-tabs="' . esc_attr($uid) . '"><div class="pa-agenda-day-tab-list" role="tablist">';
-            $i = 0;
-            foreach ($groups as $date_key => $day_events) {
-                $label = $date_key === 'unscheduled' ? 'Unscheduled' : $this->format_agenda_date($date_key, $date_display);
-                echo '<button type="button" class="pa-agenda-day-tab' . ($i === 0 ? ' active' : '') . '" style="' . esc_attr($tab_button_style) . '" role="tab" aria-selected="' . ($i === 0 ? 'true' : 'false') . '" data-pa-day-target="' . esc_attr($uid . '-' . $i) . '">' . esc_html($label) . '</button>';
+        echo '<div class="pa-schedule pa-card-size-' . esc_attr($card_size) . ' pa-date-display-' . esc_attr($date_display) . ' pa-display-' . esc_attr($display_mode) . '" style="' . esc_attr($style) . '">';
+        if (!$events) { echo '<p>No events found.</p></div>'; return ob_get_clean(); }
+        $tabs_id = 'pa-tabs-' . $program_id . '-' . wp_rand(1000, 9999);
+        if ($display_mode === 'tabs') {
+            echo '<div class="pa-date-tabs" role="tablist">';
+            $i=0;
+            foreach ($by_date as $date=>$items) {
+                $label = $date === 'unscheduled' ? 'Unscheduled' : date_i18n('M j', strtotime($date));
+                echo '<button type="button" class="pa-date-tab' . ($i===0?' active':'') . '" role="tab" aria-selected="' . ($i===0?'true':'false') . '" aria-controls="' . esc_attr($tabs_id . '-' . $i) . '">' . esc_html($label) . '</button>';
                 $i++;
             }
-            echo '</div><div class="pa-agenda-day-panels">';
-            $i = 0;
-            foreach ($groups as $date_key => $day_events) {
-                echo '<div class="pa-agenda-day-panel' . ($i === 0 ? ' active' : '') . '" id="' . esc_attr($uid . '-' . $i) . '"><div class="pa-event-list">';
-                foreach ($day_events as $event) { $render_agenda_event($event); }
-                echo '</div></div>';
-                $i++;
-            }
-            echo '</div></div>';
-            echo '<script>(function(){var root=document.querySelector("[data-pa-day-tabs=\"' . esc_js($uid) . '\"]");if(!root||root.dataset.paTabsReady)return;root.dataset.paTabsReady="1";root.addEventListener("click",function(e){var btn=e.target.closest?e.target.closest(".pa-agenda-day-tab"):null;if(!btn||!root.contains(btn))return;var target=btn.getAttribute("data-pa-day-target");root.querySelectorAll(".pa-agenda-day-tab").forEach(function(b){b.classList.remove("active");b.setAttribute("aria-selected","false")});root.querySelectorAll(".pa-agenda-day-panel").forEach(function(p){p.classList.toggle("active",p.id===target)});btn.classList.add("active");btn.setAttribute("aria-selected","true");});})();</script>';
-        } else {
-            echo '<div class="pa-event-list">';
-            foreach ($events as $event) { $render_agenda_event($event); }
             echo '</div>';
         }
-        if (!$events) { echo '<p>No events have been added yet.</p>'; }
+        $i=0;
+        foreach ($by_date as $date=>$items) {
+            $panel_label = $date === 'unscheduled' ? 'Unscheduled' : date_i18n('F j, Y', strtotime($date));
+            echo '<section id="' . esc_attr($tabs_id . '-' . $i) . '" class="pa-date-panel' . ($i===0?' active':'') . '"' . ($display_mode === 'tabs' && $i!==0 ? ' hidden' : '') . '>';
+            if ($display_mode === 'stacked') { echo '<h3 class="pa-stacked-date-heading">' . esc_html($panel_label) . '</h3>'; }
+            foreach ($items as $event) { echo $this->event_card($event->ID, $show, $settings, $program_id); }
+            echo '</section>';
+            $i++;
+        }
         echo '</div>';
-        echo '</section>';
         return ob_get_clean();
     }
 
+    private function css_vars_for_border($settings, $key, $prefix) {
+        $border = isset($settings[$key]) && is_array($settings[$key]) ? $settings[$key] : [];
+        $css = '';
+        if (!empty($border['color'])) { $css .= '--' . $prefix . '-border-color:' . esc_attr($border['color']) . ';'; }
+        foreach (['tl','tr','br','bl'] as $corner) {
+            if (isset($border['radius_' . $corner])) { $css .= '--' . $prefix . '-radius-' . $corner . ':' . max(0, intval($border['radius_' . $corner])) . 'px;'; }
+        }
+        foreach (['top','right','bottom','left'] as $side) {
+            if (isset($border['width_' . $side])) { $css .= '--' . $prefix . '-border-' . $side . ':' . max(0, intval($border['width_' . $side])) . 'px;'; }
+        }
+        return $css;
+    }
 
-    public function shortcode_program_speakers($atts) {
-        $atts = shortcode_atts(['id'=>''], $atts, 'program_speakers');
+    private function event_card($event_id, $show_description, $settings = [], $program_id = 0) {
+        $event = get_post($event_id);
+        if (!$event) { return ''; }
+        $cat = get_post_meta($event_id, '_pa_event_category', true);
+        $cats = $program_id ? get_post_meta($program_id, '_pa_categories', true) : [];
+        $cat_data = ['color'=>'var(--pa-agenda-bar-color,#1d2327)','icon'=>'none'];
+        if (is_array($cats)) {
+            foreach ($cats as $c) { if (($c['name'] ?? '') === $cat) { $cat_data = $c; break; } }
+        }
+        $date = get_post_meta($event_id, '_pa_event_date', true);
+        $time = get_post_meta($event_id, '_pa_event_time', true);
+        $end = get_post_meta($event_id, '_pa_event_end_time', true);
+        $loc = get_post_meta($event_id, '_pa_event_location', true);
+        $loc_link = get_post_meta($event_id, '_pa_event_location_link', true);
+        $date_display = in_array(($settings['date_display'] ?? 'numeric'), ['numeric','abbrev'], true) ? $settings['date_display'] : 'numeric';
+        $card_size = $this->normalize_agenda_card_size($settings['card_size'] ?? 'full');
+        $datebar = $this->event_card_datebar($date, $cat_data, $date_display);
+        $time_text = $this->format_time_range($time, $end);
+        $meta_bits = [];
+        if ($time_text) { $meta_bits[] = $time_text; }
+        if ($loc) {
+            $loc_html = $loc_link ? '<a href="' . esc_url($loc_link) . '" target="_blank" rel="noopener">' . esc_html($loc) . '</a>' : esc_html($loc);
+            $meta_bits[] = $loc_html;
+        }
+        $style = '';
+        if (!empty($cat_data['color'])) { $style .= '--pa-event-category-color:' . esc_attr($cat_data['color']) . ';'; }
+        $out = '<article class="pa-event-card pa-event-card-' . esc_attr($card_size) . '" style="' . esc_attr($style) . '">';
+        $out .= $datebar;
+        $out .= '<div class="pa-event-card__body"><h3 class="pa-event-card__title"><a href="' . esc_url(get_permalink($event_id)) . '">' . esc_html(get_the_title($event_id)) . '</a></h3>';
+        if ($meta_bits) { $out .= '<p class="pa-event-card__meta">' . implode(' <span aria-hidden="true">•</span> ', $meta_bits) . '</p>'; }
+        if ($show_description && $event->post_content) { $out .= '<div class="pa-event-card__desc">' . wp_kses_post(wpautop($event->post_content)) . '</div>'; }
+        if ($card_size !== 'thin') {
+            $speaker_ids = get_post_meta($event_id, '_pa_speaker_ids', true);
+            if (is_array($speaker_ids) && $speaker_ids) { $out .= $this->speaker_card_list($speaker_ids, $program_id, 'agenda'); }
+        }
+        $out .= '</div></article>';
+        return $out;
+    }
+
+    private function event_card_datebar($date, $cat_data, $date_display = 'numeric') {
+        $date_ts = $date ? strtotime($date) : false;
+        if ($date_ts && $date_display === 'abbrev') {
+            $month = date_i18n('M', $date_ts);
+            $day = date_i18n('j', $date_ts);
+            return '<div class="pa-event-card__datebar"><span class="pa-date-month">' . esc_html($month) . '</span><span class="pa-date-day">' . esc_html($day) . '</span></div>';
+        }
+        if ($date_ts) {
+            $day = date_i18n('j', $date_ts);
+            return '<div class="pa-event-card__datebar"><span class="pa-date-day">' . esc_html($day) . '</span></div>';
+        }
+        return '<div class="pa-event-card__datebar"><span class="pa-date-day">–</span></div>';
+    }
+
+    private function speaker_card_list($ids, $program_id = 0, $context = 'default') {
+        $style = '';
+        if ($program_id) {
+            $settings = get_post_meta($program_id, '_pa_speaker_card_settings', true);
+            if (is_array($settings)) {
+                if (!empty($settings['background'])) { $style .= '--pa-speaker-card-bg:' . esc_attr($settings['background']) . ';'; }
+                if (!empty($settings['color'])) { $style .= '--pa-speaker-card-color:' . esc_attr($settings['color']) . ';'; }
+                if (!empty($settings['border_color'])) { $style .= '--pa-speaker-card-border-color:' . esc_attr($settings['border_color']) . ';'; }
+                $style .= $this->css_vars_for_border($settings, 'border', 'pa-speaker-card');
+            }
+        }
+        $class = $context === 'agenda' ? 'pa-speaker-card-list pa-speaker-card-list-agenda' : 'pa-speaker-card-list';
+        $out = '<div class="' . esc_attr($class) . '" style="' . esc_attr($style) . '">';
+        foreach ($ids as $id) { $out .= $this->speaker_card($id, $program_id); }
+        $out .= '</div>';
+        return $out;
+    }
+
+    private function speaker_card($speaker_id, $program_id = 0) {
+        $post = get_post($speaker_id); if (!$post) { return ''; }
+        $settings = $program_id ? get_post_meta($program_id, '_pa_speaker_card_settings', true) : [];
+        if (!is_array($settings)) { $settings = []; }
+        $show_thumb = !empty($settings['show_thumbnail']);
+        $shape = $settings['thumbnail_shape'] ?? 'theme';
+        $image_id = absint(get_post_meta($speaker_id, '_pa_speaker_image_id', true));
+        $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'thumbnail') : '';
+        $role = get_post_meta($speaker_id, '_pa_speaker_role_title', true);
+        $company = get_post_meta($speaker_id, '_pa_speaker_company', true);
+        $creds = get_post_meta($speaker_id, '_pa_speaker_credentials', true);
+        $classes = 'pa-speaker-card';
+        if (!$show_thumb) { $classes .= ' no-thumb'; }
+        $out = '<a class="' . esc_attr($classes) . '" href="' . esc_url(get_permalink($speaker_id)) . '">';
+        if ($show_thumb) {
+            $img_class = 'pa-speaker-card-thumb';
+            if ($shape === 'circle') { $img_class .= ' is-circle'; }
+            if ($shape === 'square') { $img_class .= ' is-square'; }
+            $out .= '<span class="pa-speaker-card-image">';
+            $out .= $image_url ? '<img class="' . esc_attr($img_class) . '" src="' . esc_url($image_url) . '" alt="' . esc_attr($post->post_title) . '">' : '<span class="pa-speaker-card-placeholder ' . esc_attr($shape === 'circle' ? 'is-circle' : ($shape === 'square' ? 'is-square' : '')) . '"></span>';
+            $out .= '</span>';
+        }
+        $out .= '<span class="pa-speaker-card-text"><h3>' . esc_html($post->post_title . ($creds ? ', ' . $creds : '')) . '</h3>';
+        if ($role) { $out .= '<p>' . esc_html($role) . '</p>'; }
+        if ($company) { $out .= '<p>' . esc_html($company) . '</p>'; }
+        $out .= '</span></a>';
+        return $out;
+    }
+
+    public function shortcode_program_sponsors($atts) {
+        $atts = shortcode_atts(['id'=>0], $atts, 'program_sponsors');
         $program_id = $this->resolve_program_shortcode_id($atts['id']);
-        $program = get_post($program_id);
-        if (!$program || $program->post_type !== 'pa_program') { return ''; }
-
-        $events = get_posts([
-            'post_type'=>'pa_event',
+        if (!$program_id) { return '<p>Program not found.</p>'; }
+        $primary_level = get_post_meta($program_id, '_pa_primary_sponsor_level', true);
+        $sponsors = get_posts([
+            'post_type'=>'pa_sponsor',
             'post_status'=>'publish',
             'numberposts'=>-1,
-            'meta_key'=>'_pa_event_date',
-            'orderby'=>'meta_value',
+            'orderby'=>'title',
             'order'=>'ASC',
+            'meta_query'=>[
+                [
+                    'key'=>'_pa_sponsor_program_ids',
+                    'value'=>'i:' . $program_id . ';',
+                    'compare'=>'LIKE',
+                ],
+            ],
+        ]);
+        $grouped = [];
+        foreach ($sponsors as $sponsor) {
+            $levels = $this->sponsor_levels_for_program($sponsor->ID, $program_id);
+            if (!$levels) { $levels = ['Sponsors']; }
+            foreach ($levels as $level) {
+                if (!isset($grouped[$level])) { $grouped[$level] = []; }
+                $grouped[$level][] = $sponsor;
+            }
+        }
+        if (!$grouped) { return '<p>No sponsors found.</p>'; }
+        $ordered = [];
+        if ($primary_level !== '' && isset($grouped[$primary_level])) {
+            $ordered[$primary_level] = $grouped[$primary_level];
+            unset($grouped[$primary_level]);
+        }
+        foreach ($grouped as $level => $items) { $ordered[$level] = $items; }
+        ob_start();
+        echo '<div class="pa-program-sponsors">';
+        foreach ($ordered as $level=>$items) {
+            $is_primary = ($primary_level !== '' && $level === $primary_level);
+            echo '<section class="pa-sponsor-level ' . ($is_primary ? 'pa-sponsor-level-primary' : '') . '"><h2>' . esc_html($level) . '</h2><div class="pa-sponsor-grid">';
+            foreach ($items as $sponsor) {
+                $logo_id = absint(get_post_meta($sponsor->ID, '_pa_sponsor_logo_id', true));
+                $logo = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
+                $website = get_post_meta($sponsor->ID, '_pa_sponsor_website', true);
+                $inner = $logo ? '<img src="' . esc_url($logo) . '" alt="' . esc_attr($sponsor->post_title) . '">' : '<span>' . esc_html($sponsor->post_title) . '</span>';
+                $href = $website ?: get_permalink($sponsor->ID);
+                echo '<a class="pa-sponsor-logo-card" href="' . esc_url($href) . '" target="_blank" rel="noopener">' . $inner . '</a>';
+            }
+            echo '</div></section>';
+        }
+        echo '</div>';
+        return ob_get_clean();
+    }
+
+    public function shortcode_program_speakers($atts) {
+        $atts = shortcode_atts(['id'=>0], $atts, 'program_speakers');
+        $program_id = $this->resolve_program_shortcode_id($atts['id']);
+        if (!$program_id) { return '<p>Program not found.</p>'; }
+        $events = get_posts([
+            'post_type'=>'pa_event','post_status'=>'publish','numberposts'=>-1,
             'meta_query'=>[['key'=>'_pa_program_id','value'=>$program_id,'compare'=>'=']],
         ]);
-
         $speaker_ids = [];
+        $speaker_categories = [];
         foreach ($events as $event) {
             $ids = get_post_meta($event->ID, '_pa_speaker_ids', true);
-            if (!is_array($ids)) { continue; }
-            foreach ($ids as $speaker_id) {
-                $speaker_id = absint($speaker_id);
-                if ($speaker_id && get_post_type($speaker_id) === 'pa_speaker' && !in_array($speaker_id, $speaker_ids, true)) {
-                    $speaker_ids[] = $speaker_id;
+            if (is_array($ids)) {
+                $event_speaker_categories = get_post_meta($event->ID, '_pa_event_speaker_categories', true);
+                if (!is_array($event_speaker_categories)) { $event_speaker_categories = []; }
+                foreach ($ids as $id) {
+                    $id = absint($id);
+                    if ($id) { $speaker_ids[$id] = true; }
+                    if ($id) {
+                        foreach ([$id, (string)$id] as $category_key) {
+                            if (!empty($event_speaker_categories[$category_key])) {
+                                $speaker_categories[$id] = sanitize_text_field($event_speaker_categories[$category_key]);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        if (!$speaker_ids) { return '<p class="pa-program-speakers-empty">No speakers have been added yet.</p>'; }
-
-        $speakers = get_posts([
-            'post_type'=>'pa_speaker',
-            'post_status'=>'publish',
-            'numberposts'=>-1,
-            'post__in'=>$speaker_ids,
-            'orderby'=>'title',
-            'order'=>'ASC',
-        ]);
-
-        usort($speakers, function($a, $b) {
-            $a_last = trim((string)get_post_meta($a->ID, '_pa_last_name', true));
-            $b_last = trim((string)get_post_meta($b->ID, '_pa_last_name', true));
-            if ($a_last === '') {
-                $a_parts = preg_split('/\s+/', trim($a->post_title));
-                $a_last = $a_parts ? end($a_parts) : $a->post_title;
-            }
-            if ($b_last === '') {
-                $b_parts = preg_split('/\s+/', trim($b->post_title));
-                $b_last = $b_parts ? end($b_parts) : $b->post_title;
-            }
-            $last_compare = strcasecmp($a_last, $b_last);
-            if ($last_compare !== 0) { return $last_compare; }
-            return strcasecmp($a->post_title, $b->post_title);
-        });
-
-        $speaker_page_settings = $this->speaker_page_settings_for_program($program_id);
-        if (!is_array($speaker_page_settings)) { $speaker_page_settings = []; }
-        $directory_image_shape = $speaker_page_settings['directory_image_shape'] ?? '';
-        $directory_image_radius = $directory_image_shape === 'circle' ? '50%' : ($directory_image_shape === 'square' ? '0' : '');
-        $directory_image_border_width = isset($speaker_page_settings['directory_image_border_width']) && $speaker_page_settings['directory_image_border_width'] !== '' ? absint($speaker_page_settings['directory_image_border_width']) : 0;
-        $directory_image_border_color = !empty($speaker_page_settings['directory_image_border_color']) ? sanitize_hex_color($speaker_page_settings['directory_image_border_color']) : '';
-       $directory_image_frame_style = 'box-sizing:border-box!important;position:relative!important;overflow:hidden!important;line-height:0!important;border:0!important;';
-        $directory_image_inner_style = 'box-sizing:border-box!important;display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:cover!important;object-position:center center!important;border:0!important;margin:0!important;padding:0!important;';
-
-    if ($directory_image_radius !== '') {
-        $directory_image_frame_style .= 'border-radius:' . esc_attr($directory_image_radius) . '!important;';
-        $directory_image_inner_style .= 'border-radius:' . esc_attr($directory_image_radius) . '!important;';
-}
-
-    if ($directory_image_border_width > 0) {
-    $directory_image_frame_style .= 'padding:' . $directory_image_border_width . 'px!important;background:' . esc_attr($directory_image_border_color ?: 'currentColor') . '!important;';
-}   else {
-    $directory_image_frame_style .= 'padding:0!important;background:transparent!important;';
-}
-
+        $speaker_ids = array_keys($speaker_ids);
+        if (!$speaker_ids) { return '<p>No speakers found.</p>'; }
+        $speakers = get_posts(['post_type'=>'pa_speaker','post_status'=>'publish','numberposts'=>-1,'post__in'=>$speaker_ids,'orderby'=>'title','order'=>'ASC']);
+        $settings = $this->settings_for_program($program_id, 'speaker');
         ob_start();
-        echo '<section class="pa-program-speakers" aria-label="Program speakers">';
-        echo '<div class="pa-program-speaker-grid">';
+        echo '<div class="pa-program-speakers">';
+        echo '<div class="pa-program-speakers-grid">';
         foreach ($speakers as $speaker) {
             $image_id = absint(get_post_meta($speaker->ID, '_pa_speaker_image_id', true));
+            $image = $image_id ? wp_get_attachment_image_url($image_id, 'medium') : '';
             $role = get_post_meta($speaker->ID, '_pa_speaker_role_title', true);
             $company = get_post_meta($speaker->ID, '_pa_speaker_company', true);
-            $permalink = get_permalink($speaker);
+            $credentials = get_post_meta($speaker->ID, '_pa_speaker_credentials', true);
+            $category = $speaker_categories[$speaker->ID] ?? '';
             echo '<article class="pa-program-speaker-card">';
-            echo '<a class="pa-program-speaker-image-link" style="' . esc_attr($directory_image_frame_style) . '" href="' . esc_url($permalink) . '" aria-label="' . esc_attr($speaker->post_title) . '">';
-            if ($image_id) {
-                echo wp_get_attachment_image($image_id, 'medium', false, ['class'=>'pa-program-speaker-image', 'alt'=>esc_attr($speaker->post_title), 'style'=>$directory_image_inner_style]);
-            } else {
-                echo '<span class="pa-program-speaker-image pa-program-speaker-placeholder" style="' . esc_attr($directory_image_inner_style) . '" aria-hidden="true"></span>';
-            }
+            echo '<a class="pa-program-speaker-photo" href="' . esc_url(get_permalink($speaker->ID)) . '"' . $this->speaker_image_style_attr($settings, 'directory') . '>';
+            if ($image) { echo '<img src="' . esc_url($image) . '" alt="' . esc_attr($speaker->post_title) . '">'; } else { echo '<span class="pa-speaker-placeholder"></span>'; }
             echo '</a>';
-            echo '<h3 class="pa-program-speaker-name"><a href="' . esc_url($permalink) . '">' . esc_html($speaker->post_title) . '</a></h3>';
-            if ($role) { echo '<p class="pa-program-speaker-role">' . esc_html($role) . '</p>'; }
-            if ($company) { echo '<p class="pa-program-speaker-company">' . esc_html($company) . '</p>'; }
+            echo '<h3 class="pa-program-speaker-name"><a href="' . esc_url(get_permalink($speaker->ID)) . '">' . esc_html($speaker->post_title . ($credentials ? ', ' . $credentials : '')) . '</a></h3>';
+            if ($category) { echo '<p class="pa-program-speaker-category">' . esc_html($category) . '</p>'; }
+            if ($role) { echo '<p class="pa-program-speaker-meta">' . esc_html($role) . '</p>'; }
+            if ($company) { echo '<p class="pa-program-speaker-meta">' . esc_html($company) . '</p>'; }
             echo '</article>';
         }
-        echo '</div></section>';
+        echo '</div></div>';
         return ob_get_clean();
     }
 
     public function shortcode_program_pdf($atts) {
-        $atts = shortcode_atts(['id'=>'', 'label'=>'Download as PDF'], $atts, 'program_pdf');
+        $atts = shortcode_atts(['id'=>0], $atts, 'program_pdf');
         $program_id = $this->resolve_program_shortcode_id($atts['id']);
-        $program = get_post($program_id);
-        if (!$program || $program->post_type !== 'pa_program') { return ''; }
-        $url = add_query_arg('pa_program_pdf', $program_id, home_url('/'));
-        $label = trim(wp_strip_all_tags((string)($atts['label'] ?? '')));
-        if ($label === '') { $label = 'Download as PDF'; }
-        return '<p class="pa-program-pdf-download"><a class="pa-program-pdf-link" href="' . esc_url($url) . '" target="_blank" rel="noopener">' . esc_html($label) . '</a></p>';
+        if (!$program_id) { return '<p>Program not found.</p>'; }
+        $url = add_query_arg(['program_pdf'=>$program_id], home_url('/'));
+        return '<a class="pa-program-pdf-button" href="' . esc_url($url) . '" target="_blank" rel="noopener">Download Program PDF</a>';
     }
 
     public function maybe_render_program_pdf_page() {
-        if (empty($_GET['pa_program_pdf'])) { return; }
-        $program_id = absint($_GET['pa_program_pdf']);
-        $program = get_post($program_id);
-        if (!$program || $program->post_type !== 'pa_program') {
-            status_header(404);
-            wp_die(esc_html__('Program not found.', 'program-agenda'));
-        }
-
-        $events = get_posts([
-            'post_type' => 'pa_event',
-            'post_status' => 'publish',
-            'numberposts' => -1,
-            'meta_query' => [['key'=>'_pa_program_id','value'=>$program_id,'compare'=>'=']],
-        ]);
-        usort($events, function($a, $b) {
-            $cmp = $this->agenda_event_sort_value($a) <=> $this->agenda_event_sort_value($b);
-            if ($cmp !== 0) { return $cmp; }
-            return strcasecmp($a->post_title, $b->post_title);
-        });
-
-        $program_url = get_post_meta($program_id, '_pa_back_to_link', true);
-        if (!$program_url) { $program_url = home_url('/'); }
-        $generated = date_i18n(get_option('date_format', 'F j, Y'));
-        $logo_url = '';
-        $logo_id = function_exists('get_theme_mod') ? absint(get_theme_mod('custom_logo')) : 0;
-        if ($logo_id) { $logo_url = wp_get_attachment_image_url($logo_id, 'full'); }
-        $site_name = get_bloginfo('name');
-
-        nocache_headers();
-        header('Content-Type: text/html; charset=' . get_bloginfo('charset'));
-        echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html($program->post_title) . ' Program PDF</title>';
-        echo '<style>
-            :root{color-scheme:light;}
-            body{margin:0;background:#f6f7f7;color:#1d2327;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.45;}
-            .pa-program-print-page{max-width:900px;margin:0 auto;padding:48px 36px;background:#fff;min-height:100vh;box-sizing:border-box;}
-            .pa-program-print-actions{position:sticky;top:0;z-index:2;margin:-48px -36px 32px;padding:14px 36px;background:#f6f7f7;border-bottom:1px solid #dcdcde;text-align:right;}
-            .pa-program-print-actions button{appearance:none;border:1px solid #1d2327;background:#1d2327;color:#fff;border-radius:4px;padding:8px 14px;cursor:pointer;}
-            .pa-program-print-logo{max-width:220px;max-height:90px;width:auto;height:auto;object-fit:contain;margin:0 0 28px;display:block;}
-            .pa-program-print-site-name{margin:0 0 22px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#646970;}
-            .pa-program-print-title{margin:0 0 10px;font-size:34px;line-height:1.08;}
-            .pa-program-print-note{margin:0 0 34px;color:#50575e;font-size:14px;border-bottom:1px solid #dcdcde;padding-bottom:22px;}
-            .pa-program-print-note a{color:inherit;}
-            .pa-program-print-day{margin:34px 0 14px;font-size:20px;line-height:1.2;border-bottom:2px solid #1d2327;padding-bottom:8px;}
-            .pa-program-print-event{break-inside:avoid;page-break-inside:avoid;margin:0 0 22px;padding:0 0 22px;border-bottom:1px solid #dcdcde;}
-            .pa-program-print-event:last-child{border-bottom:0;}
-            .pa-program-print-time{margin:0 0 4px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#646970;}
-            .pa-program-print-event-title{margin:0 0 8px;font-size:18px;line-height:1.2;}
-            .pa-program-print-meta{margin:0 0 10px;font-size:13px;color:#50575e;}
-            .pa-program-print-description{margin:10px 0 0;font-size:14px;}
-            .pa-program-print-description > :first-child{margin-top:0;}
-            .pa-program-print-description > :last-child{margin-bottom:0;}
-            .pa-program-print-speakers{margin:12px 0 0;}
-            .pa-program-print-speakers h3{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;}
-            .pa-program-print-speakers ul{margin:0;padding-left:18px;}
-            .pa-program-print-speakers li{margin:0 0 5px;}
-            .pa-program-print-speaker-detail{color:#50575e;font-size:13px;}
-            .pa-program-print-empty{margin:24px 0;color:#646970;}
-            @media print{body{background:#fff}.pa-program-print-page{max-width:none;padding:0;background:#fff}.pa-program-print-actions{display:none}.pa-program-print-note{font-size:11px}.pa-program-print-title{font-size:28px}.pa-program-print-day{break-after:avoid;page-break-after:avoid}.pa-program-print-event{break-inside:avoid;page-break-inside:avoid}}
-        </style>';
-        echo '</head><body><main class="pa-program-print-page">';
-        echo '<div class="pa-program-print-actions"><button type="button" onclick="window.print()">Print / Save as PDF</button></div>';
-        if ($logo_url) { echo '<img class="pa-program-print-logo" src="' . esc_url($logo_url) . '" alt="' . esc_attr($site_name) . '">'; }
-        else { echo '<p class="pa-program-print-site-name">' . esc_html($site_name) . '</p>'; }
-        echo '<h1 class="pa-program-print-title">' . esc_html($program->post_title) . '</h1>';
-        echo '<p class="pa-program-print-note">Generated on ' . esc_html($generated) . ' and subject to change. Visit <a href="' . esc_url($program_url) . '">' . esc_html($program_url) . '</a> for the latest agenda.</p>';
-
-        if (!$events) {
-            echo '<p class="pa-program-print-empty">No events have been added yet.</p>';
-        } else {
-            $current_day = '';
-            foreach ($events as $event) {
-                $date = get_post_meta($event->ID, '_pa_event_date', true);
-                $day_key = $date ? date_i18n('Y-m-d', strtotime($date)) : 'unscheduled';
-                if ($day_key !== $current_day) {
-                    $current_day = $day_key;
-                    $day_label = $date && strtotime($date) ? date_i18n('F j, Y', strtotime($date)) : 'Unscheduled';
-                    echo '<h2 class="pa-program-print-day">' . esc_html($day_label) . '</h2>';
-                }
-                $start = get_post_meta($event->ID, '_pa_event_time', true);
-                $end = get_post_meta($event->ID, '_pa_event_end_time', true);
-                $time = trim($start . ($end ? ' – ' . $end : ''));
-                $location = get_post_meta($event->ID, '_pa_event_location', true);
-                $category = get_post_meta($event->ID, '_pa_event_category', true);
-                echo '<article class="pa-program-print-event">';
-                if ($time) { echo '<p class="pa-program-print-time">' . esc_html($time) . '</p>'; }
-                echo '<h3 class="pa-program-print-event-title">' . esc_html($event->post_title) . '</h3>';
-                $meta = array_filter([$category, $location]);
-                if ($meta) { echo '<p class="pa-program-print-meta">' . esc_html(implode(' • ', $meta)) . '</p>'; }
-                if ($event->post_content) { echo '<div class="pa-program-print-description">' . wp_kses_post(wpautop($event->post_content)) . '</div>'; }
-                $speaker_ids = get_post_meta($event->ID, '_pa_speaker_ids', true);
-                if (!is_array($speaker_ids)) { $speaker_ids = []; }
-                if ($speaker_ids) {
-                    echo '<section class="pa-program-print-speakers"><h3>Speakers</h3><ul>';
-                    foreach ($speaker_ids as $speaker_id) {
-                        $speaker = get_post(absint($speaker_id));
-                        if (!$speaker || $speaker->post_type !== 'pa_speaker') { continue; }
-                        $credentials = get_post_meta($speaker->ID, '_pa_speaker_credentials', true);
-                        $role = get_post_meta($speaker->ID, '_pa_speaker_role_title', true);
-                        $company = get_post_meta($speaker->ID, '_pa_speaker_company', true);
-                        $name = $speaker->post_title . ($credentials ? ', ' . $credentials : '');
-                        $detail = implode(' • ', array_filter([$role, $company]));
-                        echo '<li><strong>' . esc_html($name) . '</strong>' . ($detail ? '<br><span class="pa-program-print-speaker-detail">' . esc_html($detail) . '</span>' : '') . '</li>';
-                    }
-                    echo '</ul></section>';
-                }
-                echo '</article>';
+        $program_id = isset($_GET['program_pdf']) ? absint($_GET['program_pdf']) : 0;
+        if (!$program_id || get_post_type($program_id) !== 'pa_program') { return; }
+        $html = '<!doctype html><html><head><meta charset="utf-8"><title>' . esc_html(get_the_title($program_id)) . ' Program PDF</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:28px;margin:0 0 16px}.event{border-bottom:1px solid #ddd;padding:14px 0}.meta{color:#555;font-size:13px}.speakers{font-size:13px;color:#333}</style></head><body onload="window.print()">';
+        $html .= '<h1>' . esc_html(get_the_title($program_id)) . '</h1>';
+        $events = get_posts(['post_type'=>'pa_event','post_status'=>'publish','numberposts'=>-1,'meta_key'=>'_pa_event_date','orderby'=>'meta_value','order'=>'ASC','meta_query'=>[['key'=>'_pa_program_id','value'=>$program_id,'compare'=>'=']]]);
+        foreach ($events as $event) {
+            $html .= '<div class="event"><h2>' . esc_html($event->post_title) . '</h2>';
+            $html .= '<div class="meta">' . esc_html($this->format_event_when($event->ID)) . ' — ' . esc_html(get_post_meta($event->ID, '_pa_event_location', true)) . '</div>';
+            $html .= wpautop(wp_kses_post($event->post_content));
+            $speaker_ids = get_post_meta($event->ID, '_pa_speaker_ids', true);
+            if (is_array($speaker_ids) && $speaker_ids) {
+                $names = array_map('get_the_title', array_map('absint', $speaker_ids));
+                $html .= '<div class="speakers"><strong>Speakers:</strong> ' . esc_html(implode(', ', array_filter($names))) . '</div>';
             }
+            $html .= '</div>';
         }
-        echo '</main><script>window.addEventListener("load",function(){setTimeout(function(){window.print();},250);});</script></body></html>';
+        $html .= '</body></html>';
+        echo $html;
         exit;
     }
 
-    public function shortcode_program_sponsors($atts) {
-        $atts = shortcode_atts(['id'=>''], $atts, 'program_sponsors');
-        $program_id = $this->resolve_program_shortcode_id($atts['id']);
-        $program = get_post($program_id);
-        if (!$program || $program->post_type !== 'pa_program') { return ''; }
-
-        $levels = get_post_meta($program_id, '_pa_sponsor_levels', true);
-        if (!is_array($levels)) { $levels = []; }
-        $levels = array_values(array_filter(array_map('trim', array_map('wp_strip_all_tags', $levels))));
-
-        $all_sponsors = get_posts([
-            'post_type' => 'pa_sponsor',
-            'post_status' => 'publish',
-            'numberposts' => -1,
-            'orderby' => 'title',
-            'order' => 'ASC',
-        ]);
-        $sponsors = array_values(array_filter($all_sponsors, function($sponsor) use ($program_id) {
-            return in_array(absint($program_id), $this->sponsor_program_ids($sponsor->ID), true);
-        }));
-
-        $grouped = [];
-        foreach ($levels as $level) { $grouped[$level] = []; }
-        $unleveled = [];
-        foreach ($sponsors as $sponsor) {
-            $sponsor_levels = $this->sponsor_levels_for_program($sponsor->ID, $program_id);
-            $matched = false;
-            foreach ($levels as $level) {
-                if (in_array($level, $sponsor_levels, true)) {
-                    $grouped[$level][] = $sponsor;
-                    $matched = true;
-                }
-            }
-            if (!$matched) { $unleveled[] = $sponsor; }
+    private function speaker_primary_program_id($speaker_id) {
+        $program_id = absint(get_post_meta($speaker_id, '_pa_speaker_style_program_id', true));
+        if ($program_id) { return $program_id; }
+        $events = $this->speaker_event_ids($speaker_id);
+        if ($events) {
+            $event_program = absint(get_post_meta($events[0], '_pa_program_id', true));
+            if ($event_program) { return $event_program; }
         }
-        if ($unleveled) { $grouped['Sponsors'] = $unleveled; }
-
-        $primary_sponsor_level = get_post_meta($program_id, '_pa_primary_sponsor_level', true);
-
-        ob_start();
-        echo '<section class="pa-sponsor-showcase" aria-label="Sponsors">';
-        $printed = 0;
-        foreach ($grouped as $level => $level_sponsors) {
-            if (!$level_sponsors) { continue; }
-            $is_primary_sponsor_level = ($primary_sponsor_level !== '' && $level === $primary_sponsor_level);
-
-echo '<section class="pa-sponsor-level-group' . ($is_primary_sponsor_level ? ' pa-sponsor-level-group--primary' : '') . '">';
-if ($is_primary_sponsor_level) {
-    echo '<h2>' . esc_html($level) . '</h2>';
-} else {
-    echo '<h3>' . esc_html($level) . '</h3>';
-}
-echo '<div class="pa-sponsor-logo-grid">';
-            foreach ($level_sponsors as $sponsor) { echo $this->sponsor_showcase_logo($sponsor); }
-            echo '</div></section>';
-            $printed++;
-        }
-        if ($printed === 0) { echo '<p>No sponsors have been added yet.</p>'; }
-        echo '</section>';
-        return ob_get_clean();
-    }
-
-    private function sponsor_showcase_logo($sponsor) {
-        $logo_id = absint(get_post_meta($sponsor->ID, '_pa_sponsor_logo_id', true));
-        $url = get_permalink($sponsor);
-        ob_start();
-        echo '<a class="pa-sponsor-showcase-logo" href="' . esc_url($url) . '">';
-        if ($logo_id) {
-            echo wp_get_attachment_image($logo_id, 'full', false, ['class'=>'pa-sponsor-showcase-logo-img', 'alt'=>esc_attr($sponsor->post_title)]);
-        } else {
-            echo '<span class="pa-sponsor-showcase-name">' . esc_html($sponsor->post_title) . '</span>';
-        }
-        echo '</a>';
-        return ob_get_clean();
-    }
-
-    private function single_sponsor($post) {
-        ob_start();
-        $program_ids = $this->sponsor_program_ids($post->ID);
-        $program_id = $program_ids ? absint($program_ids[0]) : absint(get_post_meta($post->ID, '_pa_sponsor_program_id', true));
-        $s = $this->speaker_page_settings_for_program($program_id);
-        $logo_id = absint(get_post_meta($post->ID, '_pa_sponsor_logo_id', true));
-        $website = get_post_meta($post->ID, '_pa_sponsor_website', true);
-        $sponsor_page_id = 'pa-single-sponsor-' . absint($post->ID);
-        $header_color = sanitize_hex_color($s['header_color'] ?? '');
-        $content_color = sanitize_hex_color($s['content_color'] ?? '');
-        $scoped_color_css = '';
-        if ($header_color) {
-            $scoped_color_css .= '#' . $sponsor_page_id . ' .pa-single-header,#' . $sponsor_page_id . ' .pa-single-header *{color:' . $header_color . ' !important;}';
-        }
-        if ($content_color) {
-            $scoped_color_css .= '#' . $sponsor_page_id . ' .pa-single-content,#' . $sponsor_page_id . ' .pa-single-content *{color:' . $content_color . ' !important;}';
-        }
-        if ($scoped_color_css) { echo '<style>' . esc_html($scoped_color_css) . '</style>'; }
-
-        echo '<article id="' . esc_attr($sponsor_page_id) . '" class="pa-single pa-single-sponsor">';
-        echo $this->back_to_program_link($program_id);
-        echo '<header class="pa-single-header pa-speaker-hero pa-sponsor-hero ' . esc_attr($this->area_class($s, 'header')) . '" style="' . esc_attr($this->inline_header_style($s)) . '">';
-        if ($logo_id) {
-            $logo_meta = wp_get_attachment_metadata($logo_id);
-            $logo_width = is_array($logo_meta) ? absint($logo_meta['width'] ?? 0) : 0;
-            $logo_height = is_array($logo_meta) ? absint($logo_meta['height'] ?? 0) : 0;
-            $logo_shape_class = ($logo_width && $logo_height && abs($logo_width - $logo_height) <= 12) ? ' pa-sponsor-hero-logo-square' : ' pa-sponsor-hero-logo-wide';
-            echo '<div class="pa-sponsor-hero-logo' . esc_attr($logo_shape_class) . '"><a href="' . esc_url(get_permalink($post)) . '" aria-label="' . esc_attr($post->post_title) . '">' . wp_get_attachment_image($logo_id, 'full', false, ['class'=>'pa-sponsor-hero-logo-img', 'alt'=>esc_attr($post->post_title)]) . '</a></div>';
-        }
-        echo '<div class="pa-speaker-hero-text pa-sponsor-hero-text"><h5 class="pa-speaker-page-label pa-sponsor-page-label">Sponsor</h5><h3 class="pa-speaker-name pa-sponsor-name">' . esc_html($post->post_title) . '</h3>';
-        if ($website) { echo '<h6 class="pa-speaker-company pa-sponsor-website"><a href="' . esc_url($website) . '" target="_blank" rel="noopener">Learn more</a></h6>'; }
-        echo '</div></header>';
-        echo '<div class="pa-single-content ' . esc_attr($this->area_class($s, 'content')) . '" style="' . esc_attr($this->inline_content_style($s)) . '">';
-        echo '<div class="pa-single-text">' . wp_kses_post(wpautop($post->post_content)) . '</div>';
-        echo '</div>';
-        echo '</article>';
-        return ob_get_clean();
-    }
-    public function admin_bar_edit_link($wp_admin_bar) {
-        if (!is_singular(['pa_event','pa_speaker','pa_sponsor']) || !is_admin_bar_showing()) { return; }
-        $post = get_queried_object();
-        if (!$post || empty($post->ID) || !current_user_can('edit_post', $post->ID)) { return; }
-        $page = $post->post_type === 'pa_event' ? 'program-edit-event' : ($post->post_type === 'pa_speaker' ? 'program-edit-speaker' : 'program-edit-sponsor');
-        $label = $post->post_type === 'pa_event' ? 'Edit Event' : ($post->post_type === 'pa_speaker' ? 'Edit Speaker' : 'Edit Sponsor');
-        $wp_admin_bar->add_node([
-            'id' => 'pa-edit-entity',
-            'title' => $label,
-            'href' => admin_url('admin.php?page=' . $page . '&id=' . absint($post->ID)),
-        ]);
-
-        if (!in_array($post->post_type, ['pa_event','pa_speaker'], true)) { return; }
-        $program_id = $post->post_type === 'pa_event'
-            ? absint(get_post_meta($post->ID, '_pa_program_id', true))
-            : absint($this->speaker_primary_program_id($post->ID));
-        if (!$program_id || get_post_type($program_id) !== 'pa_program' || !current_user_can('edit_post', $program_id)) { return; }
-        $wp_admin_bar->add_node([
-            'id' => 'pa-edit-program',
-            'title' => 'Edit Program',
-            'href' => admin_url('admin.php?page=program-advanced-settings&id=' . absint($program_id)),
-        ]);
-    }
-
-    private function icon_char($icon) { return ['heart'=>'♥','circle'=>'●','triangle'=>'▲','square'=>'■','star'=>'★','none'=>''][$icon] ?? ''; }
-    private function format_event_time_range($event_id) {
-        $time = get_post_meta($event_id, '_pa_event_time', true);
-        if (!$time) { return ''; }
-        $start_ts = strtotime($time);
-        if (!$start_ts) { return ''; }
-        $time_text = date_i18n(get_option('time_format'), $start_ts);
-        $end_time = get_post_meta($event_id, '_pa_event_end_time', true);
-        if ($end_time) {
-            $end_ts = strtotime($end_time);
-            if ($end_ts && $end_ts > $start_ts) {
-                $time_text .= ' – ' . date_i18n(get_option('time_format'), $end_ts);
-            }
-        }
-        return $time_text;
-    }
-
-    private function format_event_start_time($event_id) {
-        $time = get_post_meta($event_id, '_pa_event_time', true);
-        if (!$time) { return ''; }
-        $start_ts = strtotime($time);
-        return $start_ts ? date_i18n(get_option('time_format'), $start_ts) : '';
-    }
-
-    private function format_event_when($event_id) {
-        $date = get_post_meta($event_id, '_pa_event_date', true);
-        if (!$date) { return ''; }
-        $date_text = date_i18n(get_option('date_format'), strtotime($date));
-        $time_text = $this->format_event_time_range($event_id);
-        return $time_text ? trim($time_text . ' • ' . $date_text) : $date_text;
+        return 0;
     }
 
     public function replace_single_content($content) {
-        if (!is_singular(['pa_event','pa_speaker','pa_sponsor']) || !in_the_loop() || !is_main_query()) { return $content; }
-        global $post;
-        if ($post->post_type === 'pa_event') { return $this->single_event($post); }
-        if ($post->post_type === 'pa_speaker') { return $this->single_speaker($post); }
-        return $this->single_sponsor($post);
+        if (is_singular('pa_event')) { return $this->single_event_content(get_the_ID()); }
+        if (is_singular('pa_speaker')) { return $this->single_speaker_content(get_the_ID()); }
+        if (is_singular('pa_sponsor')) { return $this->single_sponsor_content(get_the_ID()); }
+        return $content;
     }
 
-    private function event_page_settings_for_program($program_id) {
-        $program_id = absint($program_id);
-        if ($program_id && metadata_exists('post', $program_id, self::META_EVENT_SETTINGS)) {
-            $settings = get_post_meta($program_id, self::META_EVENT_SETTINGS, true);
-            if (is_array($settings)) { return $settings; }
-        }
-        $settings = get_option(self::OPT_EVENT, []);
-        return is_array($settings) ? $settings : [];
-    }
-
-    private function speaker_page_settings_for_program($program_id) {
-        $program_id = absint($program_id);
-        if ($program_id && metadata_exists('post', $program_id, self::META_SPEAKER_SETTINGS)) {
-            $settings = get_post_meta($program_id, self::META_SPEAKER_SETTINGS, true);
-            if (is_array($settings)) { return $settings; }
-        }
-        $settings = get_option(self::OPT_SPEAKER, []);
-        return is_array($settings) ? $settings : [];
-    }
-
-    private function event_calendar_datetimes($event_id) {
-        $event_id = absint($event_id);
-        $date = get_post_meta($event_id, '_pa_event_date', true);
-        if (!$date) { return [null, null]; }
-        $start_time = get_post_meta($event_id, '_pa_event_time', true) ?: '09:00';
-        $end_time = get_post_meta($event_id, '_pa_event_end_time', true);
-        if (!$end_time) { $end_time = date('H:i', strtotime($start_time . ' +1 hour')); }
-        try {
-            $timezone = function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone(get_option('timezone_string') ?: 'UTC');
-            $start = new DateTime($date . ' ' . $start_time, $timezone);
-            $end = new DateTime($date . ' ' . $end_time, $timezone);
-            if ($end <= $start) { $end = clone $start; $end->modify('+1 hour'); }
-            return [$start, $end];
-        } catch (Exception $e) {
-            return [null, null];
-        }
-    }
-
-    private function event_google_calendar_url($event_id) {
-        $event_id = absint($event_id);
-        [$start, $end] = $this->event_calendar_datetimes($event_id);
-        $args = [
-            'action' => 'TEMPLATE',
-            'text' => get_the_title($event_id),
-            'details' => wp_strip_all_tags(get_post_field('post_content', $event_id)),
-            'location' => get_post_meta($event_id, '_pa_event_location', true),
-        ];
-        if ($start && $end) {
-            $start_utc = clone $start;
-            $end_utc = clone $end;
-            $start_utc->setTimezone(new DateTimeZone('UTC'));
-            $end_utc->setTimezone(new DateTimeZone('UTC'));
-            $args['dates'] = $start_utc->format('Ymd\THis\Z') . '/' . $end_utc->format('Ymd\THis\Z');
-        }
-        return add_query_arg($args, 'https://calendar.google.com/calendar/render');
-    }
-
-    private function event_outlook_calendar_url($event_id) {
-        $event_id = absint($event_id);
-        [$start, $end] = $this->event_calendar_datetimes($event_id);
-        $args = [
-            'subject' => get_the_title($event_id),
-            'body' => wp_strip_all_tags(get_post_field('post_content', $event_id)),
-            'location' => get_post_meta($event_id, '_pa_event_location', true),
-        ];
-        if ($start && $end) {
-            $args['startdt'] = $start->format(DateTime::ATOM);
-            $args['enddt'] = $end->format(DateTime::ATOM);
-        }
-        return add_query_arg($args, 'https://outlook.live.com/calendar/0/deeplink/compose');
-    }
-
-    private function calendar_icon_svg() {
-        return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3.25v17.25H3.75V4H7V2Zm11.25 8.25H5.75v9h12.5v-9ZM5.75 8.25h12.5V6H5.75v2.25Z"/></svg>';
-    }
-
-    private function google_calendar_icon_svg() {
-        return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" role="img"><path fill="currentColor" d="M21.6 12.23c0-.75-.07-1.47-.2-2.16H12v4.09h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.32 2.98-7.46Z"/><path fill="currentColor" d="M12 22c2.7 0 4.97-.9 6.62-2.31l-3.24-2.51c-.9.6-2.04.95-3.38.95-2.6 0-4.8-1.76-5.58-4.12H3.08v2.59A10 10 0 0 0 12 22Z"/><path fill="currentColor" d="M6.42 14.01A6.02 6.02 0 0 1 6.1 12c0-.7.12-1.38.32-2.01V7.4H3.08A10 10 0 0 0 2 12c0 1.61.39 3.13 1.08 4.6l3.34-2.59Z"/><path fill="currentColor" d="M12 5.87c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.96 2.88 14.7 2 12 2a10 10 0 0 0-8.92 5.4l3.34 2.59C7.2 7.63 9.4 5.87 12 5.87Z"/></svg>';
-    }
-
-    private function outlook_calendar_icon_svg() {
-        return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path fill="currentColor" d="M3 5.5 13 3v18L3 18.5v-13Zm12 1H21v11h-6v-2h4V8.5h-4v-2ZM8.35 9.25c-1.63 0-2.8 1.25-2.8 3.05 0 1.82 1.17 3.06 2.8 3.06s2.8-1.24 2.8-3.06c0-1.8-1.17-3.05-2.8-3.05Zm0 1.55c.62 0 1.05.58 1.05 1.5 0 .94-.43 1.52-1.05 1.52s-1.05-.58-1.05-1.52c0-.92.43-1.5 1.05-1.5Z"/></svg>';
-    }
-
-    private function single_event($post) {
+    private function single_event_content($id) {
+        $program_id = absint(get_post_meta($id, '_pa_program_id', true));
+        $settings = $this->settings_for_program($program_id, 'event');
+        $image_id = absint(get_post_meta($id, '_pa_event_image_id', true));
+        $image = $image_id ? wp_get_attachment_image_url($image_id, 'large') : '';
+        $invite = get_post_meta($id, '_pa_event_invite_only', true) === '1';
+        $warning = get_post_meta($id, '_pa_event_invite_warning', true);
+        $show_calendar = get_post_meta($id, '_pa_event_show_add_to_calendar', true) === '1';
+        $date = get_post_meta($id, '_pa_event_date', true);
+        $time = get_post_meta($id, '_pa_event_time', true);
+        $end = get_post_meta($id, '_pa_event_end_time', true);
+        $loc = get_post_meta($id, '_pa_event_location', true);
+        $loc_link = get_post_meta($id, '_pa_event_location_link', true);
         ob_start();
-        $img = absint(get_post_meta($post->ID, '_pa_event_image_id', true));
-        $date = $this->format_event_when($post->ID);
-        $loc = get_post_meta($post->ID, '_pa_event_location', true);
-        $link = get_post_meta($post->ID, '_pa_event_location_link', true);
-        $cat = get_post_meta($post->ID, '_pa_event_category', true);
-        $program_id = absint(get_post_meta($post->ID, '_pa_program_id', true));
-        $cats = get_post_meta($program_id, '_pa_categories', true); if (!is_array($cats)) { $cats = []; }
-        $cat_map = []; foreach ($cats as $category_item) { if (!empty($category_item['name'])) { $cat_map[$category_item['name']] = $category_item; } }
-        $event_category = $cat_map[$cat] ?? ['color'=>'#000000','icon'=>'none'];
-        $event_category_icon = $this->icon_char($event_category['icon'] ?? 'none');
-        $s = $this->event_page_settings_for_program($program_id);
-        $invite_only = get_post_meta($post->ID, '_pa_event_invite_only', true) === '1';
-        $invite_warning = get_post_meta($post->ID, '_pa_event_invite_warning', true);
-        $event_page_id = 'pa-single-event-' . absint($post->ID);
-        $header_color = sanitize_hex_color($s['header_color'] ?? '');
-        $content_color = sanitize_hex_color($s['content_color'] ?? '');
-        $scoped_color_css = '';
-        if ($header_color) {
-            $scoped_color_css .= '#' . $event_page_id . ' .pa-single-header,#' . $event_page_id . ' .pa-single-header *{color:' . $header_color . ' !important;}';
-            $scoped_color_css .= '#' . $event_page_id . ' .pa-event-single-category{color:' . $header_color . ' !important;}';
-        }
-        if ($content_color) {
-            $scoped_color_css .= '#' . $event_page_id . ' .pa-single-content,#' . $event_page_id . ' .pa-single-content *{color:' . $content_color . ' !important;}';
-        }
-        if ($scoped_color_css) { echo '<style>' . esc_html($scoped_color_css) . '</style>'; }
-
-        echo '<article id="' . esc_attr($event_page_id) . '" class="pa-single pa-single-event">';
-        echo $this->back_to_program_link($program_id);
-        if ($img) { echo '<div class="pa-event-header-photo" style="' . esc_attr($this->border_style_from_settings($s, 'header')) . '">' . wp_get_attachment_image($img, 'full', false, ['class'=>'pa-event-header-image']) . '</div>'; }
-        echo '<header class="pa-single-header pa-event-hero ' . esc_attr($this->area_class($s, 'header')) . '" style="' . esc_attr($this->inline_header_style($s, (bool)$img)) . '">';
-        echo '<div class="pa-event-hero-inner"><h3>' . esc_html($post->post_title) . '</h3>';
-        echo '<div class="pa-event-meta-block"><span class="pa-event-accent-bar" aria-hidden="true"></span><div class="pa-event-meta-stack">';
-        $program_title = $program_id ? get_the_title($program_id) : '';
-        if ($cat || $program_title) { echo '<h5 class="pa-event-single-category">' . ($cat && $event_category_icon !== '' ? '<span class="pa-event-single-category-icon" aria-hidden="true">' . esc_html($event_category_icon) . '</span>' : '') . ($cat ? '<span>' . esc_html($cat) . '</span>' : '') . ($cat && $program_title ? '<span class="pa-event-single-dot">•</span>' : '') . ($program_title ? '<span>' . esc_html($program_title) . '</span>' : '') . '</h5>'; }
-        if ($date) { echo '<h5 class="pa-event-single-meta"><span class="pa-calendar-icon" aria-hidden="true">' . $this->calendar_icon_svg() . '</span><span>' . esc_html($date) . '</span></h5>'; }
-        if ($loc) { echo '<h5 class="pa-event-single-location"><span class="pa-location-pin" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.25c-3.31 0-6 2.69-6 6 0 4.41 6 13.5 6 13.5s6-9.09 6-13.5c0-3.31-2.69-6-6-6zm0 8.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5z"/></svg></span> ' . ($link ? '<a href="' . esc_url($link) . '" target="_blank" rel="noopener noreferrer">' . esc_html($loc) . '</a>' : esc_html($loc)) . '</h5>'; }
-        if (get_post_meta($post->ID, '_pa_event_show_add_to_calendar', true) === '1') { echo '<div class="pa-event-single-calendar"><h5 class="pa-event-single-calendar-heading"><span>Add to Calendar</span><span class="pa-calendar-options"><a class="pa-calendar-option" href="' . esc_url($this->event_outlook_calendar_url($post->ID)) . '" target="_blank" rel="noopener noreferrer" aria-label="Add to Outlook Calendar" title="Outlook"><span class="pa-calendar-logo">' . $this->outlook_calendar_icon_svg() . '</span></a><a class="pa-calendar-option" href="' . esc_url($this->event_google_calendar_url($post->ID)) . '" target="_blank" rel="noopener noreferrer" aria-label="Add to Google Calendar" title="Google"><span class="pa-calendar-logo">' . $this->google_calendar_icon_svg() . '</span></a></span></h5></div>'; }
-        echo '</div></div>';
-        $invite_warning_text = trim(wp_strip_all_tags($invite_warning));
-        if ($invite_only) {
-            echo '<div class="pa-event-invite-warning"><div class="pa-event-invite-warning-default"><span class="pa-event-invite-warning-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3.75 6.75h16.5v10.5H3.75V6.75Zm1.5 1.4v7.7h13.5v-7.7L12 12.9 5.25 8.15Zm12.38.1H6.37L12 12.1l5.63-3.85Z" fill="currentColor"/></svg></span><span>This event is invite only.</span></div>' . ($invite_warning_text !== '' ? '<div class="pa-event-invite-warning-text">' . wp_kses_post(wpautop($invite_warning)) . '</div>' : '') . '</div>';
-        }
-        echo '</div></header>';
-        echo '<div class="pa-single-content ' . esc_attr($this->area_class($s, 'content')) . '" style="' . esc_attr($this->inline_content_style($s)) . '">';
-        echo '<div class="pa-single-text">' . wp_kses_post(wpautop($post->post_content)) . '</div>';
-        $speaker_ids = get_post_meta($post->ID, '_pa_speaker_ids', true);
-        if (is_array($speaker_ids) && $speaker_ids) {
-            echo $this->single_event_speaker_sections($speaker_ids, $program_id, $post->ID);
-        }
-        echo '</div>';
-        $sponsor_ids = get_post_meta($post->ID, '_pa_sponsor_ids', true);
+        echo '<article class="pa-theme-event-page pa-single-event">';
+        if ($image) { echo '<div class="pa-event-hero-image"><img src="' . esc_url($image) . '" alt=""></div>'; }
+        echo '<header class="pa-event-header"' . $this->style_attr_from_settings($settings, 'header') . '><h1>' . esc_html(get_the_title($id)) . '</h1><p>' . esc_html($this->format_event_when($id)) . '</p></header>';
+        echo '<section class="pa-event-content"' . $this->style_attr_from_settings($settings, 'content') . '>';
+        if ($invite) { echo '<div class="pa-invite-warning" aria-label="Invite only">' . ($warning ? wp_kses_post(wpautop($warning)) : '<p>Invite only.</p>') . '</div>'; }
+        if ($show_calendar) { echo $this->calendar_button($id, $date, $time, $end, $loc); }
+        echo wp_kses_post(wpautop(get_post_field('post_content', $id)));
+        $speaker_ids = get_post_meta($id, '_pa_speaker_ids', true);
+        if (is_array($speaker_ids) && $speaker_ids) { echo '<h2>Speakers</h2>' . $this->speaker_card_list($speaker_ids, $program_id); }
+        $sponsor_ids = get_post_meta($id, '_pa_sponsor_ids', true);
         if (!is_array($sponsor_ids)) { $sponsor_ids = []; }
-        $sponsor_ids = array_values(array_filter(array_map('absint', $sponsor_ids)));
         if ($sponsor_ids) {
-            echo '<div class="pa-event-sponsor-logos pa-event-sponsor-logos-below"><h4>Sponsored by</h4><div class="pa-event-sponsor-logo-list">';
+            echo '<section class="pa-event-sponsors"><h2>Sponsors</h2><div class="pa-event-sponsor-logos">';
             foreach ($sponsor_ids as $sponsor_id) {
-                $sponsor = get_post($sponsor_id);
+                $sponsor = get_post(absint($sponsor_id));
                 if (!$sponsor || $sponsor->post_type !== 'pa_sponsor') { continue; }
-                $logo_id = absint(get_post_meta($sponsor_id, '_pa_sponsor_logo_id', true));
-                $sponsor_url = get_permalink($sponsor);
-                echo '<a class="pa-event-sponsor-logo" href="' . esc_url($sponsor_url) . '" aria-label="' . esc_attr($sponsor->post_title) . '">';
-                if ($logo_id) { echo wp_get_attachment_image($logo_id, 'full', false, ['class'=>'pa-event-sponsor-logo-img', 'alt'=>esc_attr($sponsor->post_title)]); }
-                else { echo '<span class="pa-event-sponsor-name">' . esc_html($sponsor->post_title) . '</span>'; }
-                echo '</a>';
+                $logo_id = absint(get_post_meta($sponsor->ID, '_pa_sponsor_logo_id', true));
+                $logo = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
+                $website = get_post_meta($sponsor->ID, '_pa_sponsor_website', true);
+                $href = $website ?: get_permalink($sponsor->ID);
+                $inner = $logo ? '<img src="' . esc_url($logo) . '" alt="' . esc_attr($sponsor->post_title) . '">' : '<span>' . esc_html($sponsor->post_title) . '</span>';
+                echo '<a class="pa-event-sponsor-logo" href="' . esc_url($href) . '" target="_blank" rel="noopener">' . $inner . '</a>';
             }
-            echo '</div></div>';
+            echo '</div></section>';
         }
-        echo '</article>'; return ob_get_clean();
-    }
-
-    private function single_event_speaker_sections($speaker_ids, $program_id, $event_id) {
-        $speaker_ids = array_values(array_filter(array_map('absint', (array)$speaker_ids)));
-        if (!$speaker_ids) { return ''; }
-
-        $event_speaker_categories = get_post_meta(absint($event_id), '_pa_event_speaker_categories', true);
-        if (!is_array($event_speaker_categories)) { $event_speaker_categories = []; }
-
-        $category_groups = [];
-        $default_ids = [];
-        foreach ($speaker_ids as $speaker_id) {
-            $speaker = get_post($speaker_id);
-            if (!$speaker || $speaker->post_type !== 'pa_speaker') { continue; }
-            $category = '';
-            foreach ([$speaker_id, (string)$speaker_id] as $key) {
-                if (isset($event_speaker_categories[$key])) { $category = trim(sanitize_text_field($event_speaker_categories[$key])); break; }
-            }
-            if ($category !== '') {
-                if (!isset($category_groups[$category])) { $category_groups[$category] = []; }
-                $category_groups[$category][] = $speaker_id;
-            } else {
-                $default_ids[] = $speaker_id;
-            }
-        }
-
-        if (!$category_groups) {
-            return '<div class="pa-event-single-speakers"><h4>Speakers</h4>' . $this->speaker_cards($speaker_ids, $program_id, 'event-page-default', 0) . '</div>';
-        }
-
-        ob_start();
-        echo '<div class="pa-single-event-speaker-sections' . (!$default_ids ? ' pa-single-event-speaker-sections--only-categorized' : '') . '">';
-        echo '<div class="pa-single-event-speaker-section-list pa-single-event-speaker-section-list--categorized">';
-        foreach ($category_groups as $category => $ids) {
-            echo '<section class="pa-single-event-speaker-section pa-single-event-speaker-section--categorized"><h4 class="pa-single-event-speaker-section-heading">' . esc_html($category) . '</h4>' . $this->speaker_cards($ids, $program_id, 'event-page-category', $event_id) . '</section>';
-        }
-        echo '</div>';
-        if ($default_ids) {
-            echo '<section class="pa-single-event-speaker-section pa-single-event-speaker-section--default"><h4 class="pa-single-event-speaker-section-heading">Speakers</h4>' . $this->speaker_cards($default_ids, $program_id, 'event-page-default', 0) . '</section>';
-        }
-        echo '</div>';
+        echo '</section>';
+        $back = $program_id ? get_post_meta($program_id, '_pa_back_to_link', true) : '';
+        if ($back) { echo '<p class="pa-back-link"><a href="' . esc_url($back) . '">Back to Program</a></p>'; }
+        echo '</article>';
         return ob_get_clean();
     }
 
-    private function single_speaker($post) {
+    private function calendar_button($id, $date, $time, $end, $loc) {
+        if (!$date || !$time) { return ''; }
+        $start_ts = strtotime($date . ' ' . $time);
+        $end_ts = $end ? strtotime($date . ' ' . $end) : strtotime('+1 hour', $start_ts);
+        if (!$start_ts || !$end_ts) { return ''; }
+        $title = get_the_title($id);
+        $details = wp_strip_all_tags(get_post_field('post_content', $id));
+        $dates = gmdate('Ymd\THis\Z', $start_ts) . '/' . gmdate('Ymd\THis\Z', $end_ts);
+        $google = add_query_arg(['action'=>'TEMPLATE','text'=>$title,'dates'=>$dates,'details'=>$details,'location'=>$loc], 'https://calendar.google.com/calendar/render');
+        return '<p><a class="pa-calendar-button" href="' . esc_url($google) . '" target="_blank" rel="noopener">Add to Calendar</a></p>';
+    }
+
+    private function single_speaker_content($id) {
+        $program_id = $this->speaker_primary_program_id($id);
+        $settings = $this->settings_for_program($program_id, 'speaker');
+        $image_id = absint(get_post_meta($id, '_pa_speaker_image_id', true));
+        $image = $image_id ? wp_get_attachment_image_url($image_id, 'medium_large') : '';
+        $role = get_post_meta($id, '_pa_speaker_role_title', true);
+        $company = get_post_meta($id, '_pa_speaker_company', true);
+        $creds = get_post_meta($id, '_pa_speaker_credentials', true);
+        $linkedin = get_post_meta($id, '_pa_speaker_linkedin', true);
+        $website = get_post_meta($id, '_pa_speaker_website', true);
         ob_start();
-        $primary_program_id = $this->speaker_primary_program_id($post->ID);
-        $s = $this->speaker_page_settings_for_program($primary_program_id);
-        $credentials = get_post_meta($post->ID, '_pa_speaker_credentials', true);
-        $role_title = get_post_meta($post->ID, '_pa_speaker_role_title', true);
-        $company = get_post_meta($post->ID, '_pa_speaker_company', true);
-        $li = get_post_meta($post->ID, '_pa_speaker_linkedin', true);
-        $web = get_post_meta($post->ID, '_pa_speaker_website', true);
-        $img = absint(get_post_meta($post->ID, '_pa_speaker_image_id', true));
-        $shape = $s['image_shape'] ?? '';
-        $image_radius = $shape === 'circle' ? '50%' : ($shape === 'square' ? '0' : '0');
-        $image_border_width = isset($s['image_border_width']) && $s['image_border_width'] !== '' ? absint($s['image_border_width']) : 0;
-        $image_border_color = !empty($s['image_border_color']) ? $s['image_border_color'] : 'currentColor';
-        $img_frame_style = 'width:150px;height:150px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex:none;';
-        $img_frame_style .= 'border-radius:' . esc_attr($image_radius) . ';';
-        if ($image_border_width > 0) {
-            $img_frame_style .= 'padding:' . $image_border_width . 'px;background-color:' . esc_attr($image_border_color) . ';';
-        }
-        $img_style = 'width:100%;height:100%;object-fit:cover;display:block;border:0;border-radius:' . esc_attr($image_radius) . ';';
-        $speaker_page_id = 'pa-single-speaker-' . absint($post->ID);
-        $header_color = sanitize_hex_color($s['header_color'] ?? '');
-        $header_bg = sanitize_hex_color($s['header_bg'] ?? '');
-        $content_color = sanitize_hex_color($s['content_color'] ?? '');
-        $scoped_color_css = '';
-        if ($header_color) {
-            $scoped_color_css .= '#' . $speaker_page_id . ' .pa-single-header,#' . $speaker_page_id . ' .pa-single-header *{color:' . $header_color . ' !important;}';
-            $scoped_color_css .= '#' . $speaker_page_id . ' .pa-speaker-icon-link,#' . $speaker_page_id . ' .pa-speaker-icon-link svg{color:' . $header_color . ' !important;fill:currentColor !important;stroke:currentColor !important;}';
-        }
-        if ($content_color) {
-            $scoped_color_css .= '#' . $speaker_page_id . ' .pa-single-content,#' . $speaker_page_id . ' .pa-single-content *{color:' . $content_color . ' !important;}';
-        }
-        if ($scoped_color_css) { echo '<style>' . esc_html($scoped_color_css) . '</style>'; }
-
-        echo '<article id="' . esc_attr($speaker_page_id) . '" class="pa-single pa-single-speaker">';
-        echo $this->back_to_program_link($primary_program_id);
-        echo '<header class="pa-single-header pa-speaker-hero ' . esc_attr($this->area_class($s, 'header')) . '" style="' . esc_attr($this->inline_header_style($s)) . '">';
-        if ($img) { echo '<div class="pa-speaker-hero-image" style="' . esc_attr($img_frame_style) . '">' . wp_get_attachment_image($img, 'medium', false, ['class'=>'pa-speaker-image','style'=>$img_style]) . '</div>'; }
-        echo '<div class="pa-speaker-hero-text"><h5 class="pa-speaker-page-label">Speaker</h5><h3 class="pa-speaker-name">' . esc_html($post->post_title);
-        if ($credentials) { echo ' <span class="pa-speaker-credentials">' . esc_html($credentials) . '</span>'; }
-        echo '</h3>';
-        $speaker_meta_parts = array_filter([$role_title, $company]);
-        if ($speaker_meta_parts) {
-        echo '<h4 class="pa-speaker-role-company">' . esc_html(implode(' • ', $speaker_meta_parts)) . '</h4>';
-   }
-        echo '</div>';
-        if ($li || $web) {
-            echo '<nav class="pa-speaker-header-links" aria-label="Speaker links">';
-            if ($li) { echo '<a class="pa-speaker-icon-link pa-speaker-icon-linkedin" href="' . esc_url($li) . '" aria-label="LinkedIn" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.32 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.1 20.45H3.54V9H7.1v11.45z"/></svg></a>'; }
-            if ($web) { echo '<a class="pa-speaker-icon-link pa-speaker-icon-website" href="' . esc_url($web) . '" aria-label="Website" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9M12 3C9.6 5.5 8.4 8.5 8.4 12s1.2 6.5 3.6 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>'; }
-            echo '</nav>';
-        }
-        echo '</header><div class="pa-single-content ' . esc_attr($this->area_class($s, 'content')) . '" style="' . esc_attr($this->inline_content_style($s)) . '">';
-        echo '<div class="pa-single-text">' . wp_kses_post(wpautop($post->post_content)) . '</div>';
-        echo '</div>';
-        echo $this->speaker_upcoming_event_cards($post->ID);
-        echo '</article>'; return ob_get_clean();
-    }
-
-    private function back_to_program_link($program_id) {
-        $program_id = absint($program_id);
-        if (!$program_id) { return ''; }
-        $url = get_post_meta($program_id, '_pa_back_to_link', true);
-        if (!$url) { return ''; }
-        return '<p class="pa-back-to-program"><a href="' . esc_url($url) . '">&larr; Back to Program</a></p>';
-    }
-
-    private function speaker_primary_program_id($speaker_id) {
-        $explicit_program_id = absint(get_post_meta($speaker_id, '_pa_speaker_style_program_id', true));
-        if ($explicit_program_id) { return $explicit_program_id; }
-        $events = $this->speaker_events($speaker_id, true);
-        if (!$events) { $events = $this->speaker_events($speaker_id, false); }
-        if (!$events) { return 0; }
-        return absint(get_post_meta($events[0]->ID, '_pa_program_id', true));
-    }
-
-    private function speaker_events($speaker_id, $upcoming_only = true) {
-        $speaker_id = absint($speaker_id);
-        if (!$speaker_id) { return []; }
-
-        // Speaker IDs may be saved as integers in serialized post meta, so searching
-        // only for the quoted string version can miss valid event relationships.
-        $meta_query = [
-            'relation' => 'AND',
-            [
-                'relation' => 'OR',
-                [
-                    'key' => '_pa_speaker_ids',
-                    'value' => '"' . $speaker_id . '"',
-                    'compare' => 'LIKE',
-                ],
-                [
-                    'key' => '_pa_speaker_ids',
-                    'value' => 'i:' . $speaker_id . ';',
-                    'compare' => 'LIKE',
-                ],
-            ],
-        ];
-
-        if ($upcoming_only) {
-            $meta_query[] = [
-                'key' => '_pa_event_date',
-                'value' => current_time('Y-m-d'),
-                'compare' => '>=',
-                'type' => 'DATE',
-            ];
-        }
-
-        return get_posts([
-            'post_type' => 'pa_event',
-            'post_status' => 'publish',
-            'numberposts' => -1,
-            'meta_key' => '_pa_event_date',
-            'orderby' => 'meta_value',
-            'order' => $upcoming_only ? 'ASC' : 'DESC',
-            'meta_query' => $meta_query,
-        ]);
-    }
-
-    private function speaker_upcoming_event_cards($speaker_id) {
-        $events = $this->speaker_events($speaker_id, true);
-        if (!$events) { return ''; }
-        ob_start();
-        echo '<section class="pa-speaker-upcoming-events"><h5>Upcoming Events</h5><div class="pa-event-list">';
-        foreach ($events as $event) {
-            $program_id = absint(get_post_meta($event->ID, '_pa_program_id', true));
-            echo $this->speaker_event_card($event, $program_id);
-        }
-        echo '</div></section>';
+        echo '<article class="pa-theme-speaker-page pa-single-speaker">';
+        echo '<header class="pa-speaker-header"' . $this->style_attr_from_settings($settings, 'header') . '>';
+        if ($image) { echo '<div class="pa-speaker-hero-image"' . $this->speaker_image_style_attr($settings, 'single') . '><img src="' . esc_url($image) . '" alt="' . esc_attr(get_the_title($id)) . '"></div>'; }
+        echo '<div><h1>' . esc_html(get_the_title($id) . ($creds ? ', ' . $creds : '')) . '</h1>';
+        if ($role) { echo '<p>' . esc_html($role) . '</p>'; }
+        if ($company) { echo '<p>' . esc_html($company) . '</p>'; }
+        echo '<div class="pa-speaker-links">';
+        if ($linkedin) { echo '<a href="' . esc_url($linkedin) . '" target="_blank" rel="noopener">LinkedIn</a>'; }
+        if ($website) { echo '<a href="' . esc_url($website) . '" target="_blank" rel="noopener">Website</a>'; }
+        echo '</div></div></header>';
+        echo '<section class="pa-speaker-content"' . $this->style_attr_from_settings($settings, 'content') . '>' . wp_kses_post(wpautop(get_post_field('post_content', $id))) . '</section>';
+        echo '</article>';
         return ob_get_clean();
     }
 
-    private function speaker_event_card($event, $program_id) {
-        return $this->agenda_event_card($event, $program_id);
-    }
-
-    private function agenda_event_card($event, $program_id) {
-        $program_id = absint($program_id);
-        $agenda = $program_id ? get_post_meta($program_id, '_pa_agenda_settings', true) : [];
-        if (!is_array($agenda)) { $agenda = []; }
-
-        $speaker_layout = 'inline';
-        $date_display = $agenda['date_display'] ?? 'numeric';
-        if (!in_array($date_display, ['numeric','abbrev'], true)) { $date_display = 'abbrev'; }
-        $card_size = $this->normalize_agenda_card_size($agenda['card_size'] ?? 'full');
-        $agenda_style = $this->agenda_item_style($agenda);
-        $show_desc = ($agenda['show_descriptions'] ?? get_post_meta($program_id, '_pa_show_event_descriptions', true) ?: 'hide') !== 'hide';
-
-        $cats = $program_id ? get_post_meta($program_id, '_pa_categories', true) : [];
-        if (!is_array($cats)) { $cats = []; }
-        $cat_map = [];
-        foreach ($cats as $c) { if (!empty($c['name'])) { $cat_map[$c['name']] = $c; } }
-
-        $cat = get_post_meta($event->ID, '_pa_event_category', true);
-        $c = $cat_map[$cat] ?? ['color'=>'#000000','icon'=>'none'];
-        $cat_color = $c['color'] ?: '#000000';
-        $event_date_raw = get_post_meta($event->ID, '_pa_event_date', true);
-        $date_text = $event_date_raw ? $this->format_agenda_date($event_date_raw, $date_display) : '';
-        $time_text = $this->format_event_start_time($event->ID);
-        $loc = get_post_meta($event->ID, '_pa_event_location', true);
-        $link = get_post_meta($event->ID, '_pa_event_location_link', true);
-        $invite_only = get_post_meta($event->ID, '_pa_event_invite_only', true) === '1';
-        $speaker_ids = get_post_meta($event->ID, '_pa_speaker_ids', true);
-        if (!is_array($speaker_ids)) { $speaker_ids = []; }
-        $item_style = trim($agenda_style . ';--pa-agenda-accent-color:' . $cat_color . ';');
-
-
-        $card_classes = [
-            'pa-event-card',
-            'pa-event-card--' . ($speaker_ids ? 'has-speakers' : 'no-speakers'),
-            'pa-event-card--speakers-' . $speaker_layout,
-            'pa-event-card--size-' . $card_size,
-        ];
-
-        $invite_icon_html = $invite_only ? '<span class="pa-event-card__invite-wrap pa-event-card__datebar-invite-wrap"><span class="pa-event-card__invite-icon" aria-label="Invite only" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.75 6.75h16.5v10.5H3.75V6.75Zm1.5 1.4v7.7h13.5v-7.7L12 12.9 5.25 8.15Zm12.38.1H6.37L12 12.1l5.63-3.85Z" fill="currentColor"/></svg></span><span class="pa-invite-tooltip" role="tooltip"><span class="pa-invite-tooltip-inner"><span>Invite only</span></span></span></span>' : '';
-
+    private function single_sponsor_content($id) {
+        $program_id = absint(get_post_meta($id, '_pa_sponsor_program_id', true));
+        $settings = $this->settings_for_program($program_id, 'event');
+        $logo_id = absint(get_post_meta($id, '_pa_sponsor_logo_id', true));
+        $logo = $logo_id ? wp_get_attachment_image_url($logo_id, 'large') : '';
+        $website = get_post_meta($id, '_pa_sponsor_website', true);
         ob_start();
-        echo '<article class="' . esc_attr(implode(' ', $card_classes)) . '" style="' . esc_attr($item_style) . '">';
-        echo '<div class="pa-event-card__datebar"><span class="pa-event-card__date">' . esc_html($date_text ?: 'Date') . '</span><span class="pa-event-card__time">' . esc_html($time_text ?: 'Time') . '</span>' . $invite_icon_html . '</div>';
-        echo '<div class="pa-event-card__body"><div class="pa-event-card__summary"><h4 class="pa-event-card__title"><a href="' . esc_url(get_permalink($event)) . '">' . esc_html($event->post_title) . '</a></h4>';
-
-        if ($cat || $loc) {
-            echo '<p class="pa-event-card__meta">';
-            if ($cat) { echo '<span class="pa-event-card__category"><span class="pa-event-card__category-icon" style="color:' . esc_attr($cat_color) . '">' . esc_html($this->icon_char($c['icon'] ?? 'none')) . '</span><span class="pa-event-card__category-text">' . esc_html($cat) . '</span></span>'; }
-            if ($cat && $loc) { echo '<span class="pa-event-card__meta-dot" aria-hidden="true">•</span>'; }
-            if ($loc) { echo '<span class="pa-event-card__location">' . ($link ? '<a href="' . esc_url($link) . '" target="_blank" rel="noopener noreferrer">' . esc_html($loc) . '</a>' : esc_html($loc)) . '</span>'; }
-            echo '</p>';
-        }
-        if ($card_size !== 'thin' && $show_desc && $event->post_content) { echo '<div class="pa-event-card__description">' . wp_kses_post(wpautop($event->post_content)) . '</div>'; }
-        echo '</div>';
-        if ($card_size !== 'thin' && $speaker_ids) { echo '<div class="pa-event-card__speakers">' . $this->speaker_cards($speaker_ids, $program_id, 'agenda', $event->ID) . '</div>'; }
-        echo '</div></article>';
+        echo '<article class="pa-theme-sponsor-page pa-single-sponsor">';
+        echo '<header class="pa-sponsor-header"' . $this->style_attr_from_settings($settings, 'header') . '>';
+        if ($logo) { echo '<div class="pa-sponsor-hero-logo"><img src="' . esc_url($logo) . '" alt="' . esc_attr(get_the_title($id)) . '"></div>'; }
+        echo '<div><h1>' . esc_html(get_the_title($id)) . '</h1>';
+        if ($website) { echo '<p><a href="' . esc_url($website) . '" target="_blank" rel="noopener">Visit website</a></p>'; }
+        echo '</div></header>';
+        echo '<section class="pa-sponsor-content"' . $this->style_attr_from_settings($settings, 'content') . '>' . wp_kses_post(wpautop(get_post_field('post_content', $id))) . '</section>';
+        echo '</article>';
         return ob_get_clean();
     }
 
-    private function inline_header_style($s, $omit_border = false) { return $this->style_from_settings($s, 'header', $omit_border); }
-    private function inline_content_style($s) { return $this->style_from_settings($s, 'content'); }
-    private function area_class($s, $area) { return !empty($s[$area . '_color']) ? 'pa-has-custom-font-color' : ''; }
-    private function style_from_settings($s, $area, $omit_border = false) {
-        $css = '';
-        if (!empty($s[$area . '_bg'])) {
-            $css .= 'background-color:' . esc_attr($s[$area . '_bg']) . ';';
-            $css .= '--pa-single-' . esc_attr($area) . '-bg:' . esc_attr($s[$area . '_bg']) . ';';
-        }
-        if (!empty($s[$area . '_color'])) {
-            $css .= 'color:' . esc_attr($s[$area . '_color']) . ';';
-            $css .= '--pa-single-' . esc_attr($area) . '-color:' . esc_attr($s[$area . '_color']) . ';';
-        }
-        if (!$omit_border) { $css .= $this->border_style_from_settings($s, $area); }
-        return $css;
+    private function format_event_when($id) {
+        $date = get_post_meta($id, '_pa_event_date', true);
+        $time = get_post_meta($id, '_pa_event_time', true);
+        $end = get_post_meta($id, '_pa_event_end_time', true);
+        $parts = [];
+        if ($date) { $parts[] = date_i18n('F j, Y', strtotime($date)); }
+        $range = $this->format_time_range($time, $end);
+        if ($range) { $parts[] = $range; }
+        return implode(' • ', $parts);
     }
 
-    private function border_style_from_settings($s, $area) {
-        $css = '';
-        $b = $s[$area . '_border'] ?? [];
-        $has_width = false;
-        foreach (['top','right','bottom','left'] as $side) { if (isset($b['width_'.$side]) && $b['width_'.$side] !== '') { $has_width = true; } }
-        if ($has_width || !empty($b['color'])) $css .= 'border-style:solid;';
-        if (!empty($b['color'])) $css .= 'border-color:' . esc_attr($b['color']) . ';';
-        foreach (['top','right','bottom','left'] as $side) { if (isset($b['width_'.$side]) && $b['width_'.$side] !== '') $css .= 'border-' . $side . '-width:' . absint($b['width_'.$side]) . 'px;'; }
-        $rmap = ['tl'=>'top-left','tr'=>'top-right','br'=>'bottom-right','bl'=>'bottom-left']; foreach ($rmap as $k=>$name) { if (isset($b['radius_'.$k]) && $b['radius_'.$k] !== '') $css .= 'border-' . $name . '-radius:' . absint($b['radius_'.$k]) . 'px;'; }
-        return $css;
+    private function format_time_range($start, $end = '') {
+        if (!$start) { return ''; }
+        $start_text = date_i18n('g:i A', strtotime($start));
+        if ($end) { return $start_text . ' – ' . date_i18n('g:i A', strtotime($end)); }
+        return $start_text;
     }
 
-    private function agenda_item_style($settings) {
-        if (!is_array($settings)) { $settings = []; }
-        $style = '';
-        if (!empty($settings['background'])) { $style .= 'background-color:' . esc_attr($settings['background']) . ';--pa-agenda-card-bg:' . esc_attr($settings['background']) . ';'; }
-        if (!empty($settings['accent_bar_color'])) { $style .= '--pa-agenda-bar-color:' . esc_attr($settings['accent_bar_color']) . ';'; }
-        $title_color = $settings['title_color'] ?? ($settings['color'] ?? '');
-        $location_color = $settings['location_color'] ?? '';
-        if (!empty($title_color)) { $style .= '--pa-agenda-title-color:' . esc_attr($title_color) . ';--pa-agenda-scroll-color:' . esc_attr($title_color) . ';'; }
-        if (!empty($location_color)) { $style .= '--pa-agenda-location-color:' . esc_attr($location_color) . ';'; if (empty($title_color)) { $style .= '--pa-agenda-scroll-color:' . esc_attr($location_color) . ';'; } }
-        $category_color = !empty($location_color) ? $location_color : $title_color;
-        if (!empty($category_color)) { $style .= '--pa-agenda-category-color:' . esc_attr($category_color) . ';'; }
-        $style .= $this->program_border_style($settings, true);
-        if (!empty($settings['border_color'])) { $style .= 'border-color:' . esc_attr($settings['border_color']) . ' !important;'; }
-        if (strpos($style, 'radius') !== false) { $style .= 'overflow:hidden;'; }
-        return $style;
+    public function admin_bar_edit_link($wp_admin_bar) {
+        if (!is_singular(['pa_event','pa_speaker','pa_sponsor']) || !current_user_can('edit_posts')) { return; }
+        $id = get_the_ID();
+        $type = get_post_type($id);
+        $page = $type === 'pa_event' ? 'program-edit-event' : ($type === 'pa_speaker' ? 'program-edit-speaker' : 'program-edit-sponsor');
+        $wp_admin_bar->add_node(['id'=>'pa-edit-entity','title'=>'Edit in Stagecard','href'=>admin_url('admin.php?page=' . $page . '&id=' . $id)]);
     }
 
-
-
-    public function maybe_clear_github_update_cache() {
-        if (!is_admin() || !current_user_can('update_plugins')) { return; }
-        if (isset($_GET['force-check']) || isset($_GET['pa_stagecard_clear_update_cache'])) {
-            delete_site_transient('pa_stagecard_github_release');
-            delete_site_transient('update_plugins');
-            if (function_exists('wp_clean_plugins_cache')) { wp_clean_plugins_cache(true); }
-        }
-    }
-
-    /**
-     * Checks the public GitHub Releases feed for newer Stagecard ZIP releases.
-     *
-     * Release setup notes:
-     * - Create tags like v1.15.137.
-     * - Attach the built WordPress plugin ZIP to the release assets.
-     * - The updater intentionally ignores GitHub's automatic source-code ZIPs.
-     */
     public function check_github_plugin_update($transient) {
-        if (empty($transient) || !is_object($transient)) { return $transient; }
-
+        if (!is_object($transient)) { $transient = new stdClass(); }
+        if (!isset($transient->checked) || !is_array($transient->checked)) { return $transient; }
         $plugin_file = plugin_basename(__FILE__);
-        if (empty($transient->checked)) { $transient->checked = []; }
-        if (empty($transient->checked[$plugin_file])) { $transient->checked[$plugin_file] = self::VERSION; }
-        if (empty($transient->response) || !is_array($transient->response)) { $transient->response = []; }
-        if (empty($transient->no_update) || !is_array($transient->no_update)) { $transient->no_update = []; }
-
-        $release = $this->github_latest_release();
-        if (!$release || empty($release['version']) || empty($release['download_url'])) { return $transient; }
-        if (!version_compare($release['version'], self::VERSION, '>')) {
-            $transient->no_update[$plugin_file] = (object) [
-                'id' => self::GITHUB_REPO,
-                'slug' => dirname($plugin_file),
-                'plugin' => $plugin_file,
-                'new_version' => self::VERSION,
-                'url' => $release['html_url'],
-                'package' => '',
-            ];
-            unset($transient->response[$plugin_file]);
-            return $transient;
-        }
-
-        unset($transient->no_update[$plugin_file]);
-        $transient->response[$plugin_file] = (object) [
-            'id' => self::GITHUB_REPO,
+        if (!isset($transient->checked[$plugin_file])) { return $transient; }
+        $release = $this->latest_github_release();
+        if (!$release || empty($release['tag_name'])) { return $transient; }
+        $latest_version = ltrim((string)$release['tag_name'], 'v');
+        $current_version = $transient->checked[$plugin_file];
+        if (version_compare($latest_version, $current_version, '<=')) { return $transient; }
+        $asset = $this->github_release_asset($release);
+        $transient->response[$plugin_file] = (object)[
             'slug' => dirname($plugin_file),
             'plugin' => $plugin_file,
-            'new_version' => $release['version'],
-            'url' => $release['html_url'],
-            'package' => $release['download_url'],
-            'tested' => $release['tested'],
-            'requires' => $release['requires'],
-            'requires_php' => $release['requires_php'],
+            'new_version' => $latest_version,
+            'url' => 'https://github.com/' . self::GITHUB_REPO,
+            'package' => $asset ?: $release['zipball_url'],
         ];
-
         return $transient;
     }
 
     public function github_plugin_info($result, $action, $args) {
-        if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== dirname(plugin_basename(__FILE__))) {
-            return $result;
-        }
-
-        $release = $this->github_latest_release(false);
+        if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== basename(dirname(__FILE__))) { return $result; }
+        $release = $this->latest_github_release();
         if (!$release) { return $result; }
-
-        return (object) [
+        $asset = $this->github_release_asset($release);
+        return (object)[
             'name' => 'Stagecard',
-            'slug' => dirname(plugin_basename(__FILE__)),
-            'version' => $release['version'],
-            'author' => '<a href="https://oliviakohring.com/">Olivia Kohring</a>',
-            'homepage' => $release['html_url'],
-            'download_link' => $release['download_url'],
-            'requires' => $release['requires'],
-            'tested' => $release['tested'],
-            'requires_php' => $release['requires_php'],
-            'last_updated' => $release['published_at'],
-            'sections' => [
-                'description' => 'Stagecard is a WordPress program manager that includes unique pages for events, speakers, and sponsors. Using simple shortcode plugins, you can easily generate an on-brand agenda featuring customizable event cards and speaker profiles. <br><br> This plugin has been created with ChatGPT.',
-                'changelog' => $release['body'] ? wp_kses_post(wpautop($release['body'])) : 'See the GitHub release notes for this version.',
-            ],
+            'slug' => basename(dirname(__FILE__)),
+            'version' => ltrim((string)$release['tag_name'], 'v'),
+            'author' => '<a href="https://github.com/okohring">Olivia Kohring</a>',
+            'homepage' => 'https://github.com/' . self::GITHUB_REPO,
+            'download_link' => $asset ?: $release['zipball_url'],
+            'sections' => ['description' => 'A program schedule builder for branded agendas.'],
         ];
     }
 
-    private function github_latest_release($use_cache = true) {
-        $cache_key = 'pa_stagecard_github_release';
-        if ($use_cache) {
-            $cached = get_site_transient($cache_key);
-            if (is_array($cached)) { return $cached; }
+    public function maybe_clear_github_update_cache() {
+        if (!is_admin() || !current_user_can('update_plugins')) { return; }
+        if (isset($_GET['pa_clear_update_cache'])) {
+            delete_site_transient('update_plugins');
+            delete_transient('pa_latest_github_release');
+            wp_safe_redirect(remove_query_arg('pa_clear_update_cache'));
+            exit;
         }
+    }
 
-        $response = wp_remote_get('https://api.github.com/repos/' . self::GITHUB_REPO . '/releases/latest', [
-            'timeout' => 12,
-            'headers' => [
-                'Accept' => 'application/vnd.github+json',
-                'User-Agent' => 'Stagecard/' . self::VERSION . '; ' . home_url('/'),
-            ],
-        ]);
-
-        if (is_wp_error($response)) { return false; }
-        $code = wp_remote_retrieve_response_code($response);
-        if ($code < 200 || $code >= 300) { return false; }
-
+    private function latest_github_release() {
+        $cached = get_transient('pa_latest_github_release');
+        if (is_array($cached)) { return $cached; }
+        $response = wp_remote_get('https://api.github.com/repos/' . self::GITHUB_REPO . '/releases/latest', ['timeout'=>10,'headers'=>['Accept'=>'application/vnd.github+json']]);
+        if (is_wp_error($response)) { return null; }
+        if ((int)wp_remote_retrieve_response_code($response) !== 200) { return null; }
         $data = json_decode(wp_remote_retrieve_body($response), true);
-        if (!is_array($data) || empty($data['tag_name'])) { return false; }
-
-        $version = ltrim((string) $data['tag_name'], 'vV');
-        $download_url = '';
-        if (!empty($data['assets']) && is_array($data['assets'])) {
-            foreach ($data['assets'] as $asset) {
-                $name = isset($asset['name']) ? strtolower((string) $asset['name']) : '';
-                if ($name && substr($name, -4) === '.zip' && !empty($asset['browser_download_url'])) {
-                    $download_url = esc_url_raw($asset['browser_download_url']);
-                    break;
-                }
-            }
-        }
-
-        // Fallback for Stagecard's release-asset naming convention, in case GitHub's asset list is delayed or filtered.
-        if (!$download_url && $version) {
-            $download_url = esc_url_raw('https://github.com/' . self::GITHUB_REPO . '/releases/download/' . rawurlencode((string) $data['tag_name']) . '/program-agenda-v' . str_replace('.', '-', $version) . '.zip');
-        }
-
-        if (!$download_url) { return false; }
-
-        $release = [
-            'version' => $version,
-            'html_url' => !empty($data['html_url']) ? esc_url_raw($data['html_url']) : 'https://github.com/' . self::GITHUB_REPO,
-            'download_url' => $download_url,
-            'published_at' => !empty($data['published_at']) ? sanitize_text_field($data['published_at']) : '',
-            'body' => !empty($data['body']) ? wp_kses_post($data['body']) : '',
-            'requires' => '5.8',
-            'tested' => '6.8',
-            'requires_php' => '7.4',
-        ];
-
-        set_site_transient($cache_key, $release, 5 * MINUTE_IN_SECONDS);
-        return $release;
+        if (!is_array($data)) { return null; }
+        set_transient('pa_latest_github_release', $data, 15 * MINUTE_IN_SECONDS);
+        return $data;
     }
 
-    private function speaker_cards($speaker_ids, $program_id = 0, $context = '', $event_id = 0) {
-        $settings = $program_id ? get_post_meta($program_id, '_pa_speaker_card_settings', true) : [];
-        if (!is_array($settings)) { $settings = []; }
-        $show_thumb = ($settings['show_thumbnail'] ?? '1') !== '0';
-        $style = '';
-        $card_color = !empty($settings['color']) ? sanitize_hex_color($settings['color']) : '';
-        $card_bg = !empty($settings['background']) ? sanitize_hex_color($settings['background']) : '';
-        if ($card_bg) { $style .= 'background-color:' . esc_attr($card_bg) . ';'; }
-        if ($card_color) { $style .= 'color:' . esc_attr($card_color) . ';--pa-speaker-card-text-color:' . esc_attr($card_color) . ';'; }
-        $text_style = $card_color ? 'color:' . esc_attr($card_color) . ' !important;' : '';
-        $style .= $this->program_border_style($settings);
-        if (!empty($settings['border_color'])) { $style .= 'border-color:' . esc_attr($settings['border_color']) . ';'; }
-        $img_class = 'pa-speaker-card-thumb';
-        if (($settings['thumbnail_shape'] ?? '') === 'circle') { $img_class .= ' is-circle'; }
-        if (($settings['thumbnail_shape'] ?? '') === 'square') { $img_class .= ' is-square'; }
-        $event_speaker_categories = $event_id ? get_post_meta(absint($event_id), '_pa_event_speaker_categories', true) : [];
-        if (!is_array($event_speaker_categories)) { $event_speaker_categories = []; }
-        $default_cards = [];
-        $categorized_cards = [];
-        foreach ((array)$speaker_ids as $sid) {
-            $sid = absint($sid);
-            $sp = get_post($sid);
-            if (!$sp || $sp->post_type !== 'pa_speaker') { continue; }
-            $category = '';
-            foreach ([$sid, (string)$sid] as $key) { if (isset($event_speaker_categories[$key])) { $category = sanitize_text_field($event_speaker_categories[$key]); break; } }
-            $role = get_post_meta($sp->ID, '_pa_speaker_role_title', true);
-            if (!$role) { $role = get_post_meta($sp->ID, '_pa_speaker_credentials', true); }
-            $company = get_post_meta($sp->ID, '_pa_speaker_company', true);
-            $img = absint(get_post_meta($sp->ID, '_pa_speaker_image_id', true));
-            ob_start();
-            echo '<div class="pa-speaker-card-unit' . ($category ? ' pa-speaker-card-unit--categorized' : '') . '">';
-            if ($category) { echo '<span class="pa-speaker-card-category-label">' . esc_html($category) . '</span>'; }
-            echo '<article class="pa-speaker-card' . ($category ? ' pa-speaker-card--categorized' : '') . '" style="' . esc_attr($style) . '">';
-            if ($show_thumb) {
-                echo '<a class="pa-speaker-card-image" href="' . esc_url(get_permalink($sp)) . '">';
-                if ($img) { echo wp_get_attachment_image($img, 'medium', false, ['class'=>$img_class]); }
-                else { echo '<span class="' . esc_attr($img_class) . ' pa-speaker-card-placeholder" aria-hidden="true"></span>'; }
-                echo '</a>';
-            }
-            echo '<div class="pa-speaker-card-text"><h3><a style="' . esc_attr($text_style) . '" href="' . esc_url(get_permalink($sp)) . '">' . esc_html($sp->post_title) . '</a></h3>';
-            if ($role) { echo '<p class="pa-speaker-card-role" style="' . esc_attr($text_style) . '">' . esc_html($role) . '</p>'; }
-            if ($company) { echo '<p class="pa-speaker-card-company" style="' . esc_attr($text_style) . '">' . esc_html($company) . '</p>'; }
-            echo '</div></article></div>';
-            $card_html = ob_get_clean();
-            if ($category) { $categorized_cards[] = $card_html; } else { $default_cards[] = $card_html; }
+    private function github_release_asset($release) {
+        if (empty($release['assets']) || !is_array($release['assets'])) { return ''; }
+        foreach ($release['assets'] as $asset) {
+            $name = $asset['name'] ?? '';
+            if (preg_match('/\.zip$/', $name) && !empty($asset['browser_download_url'])) { return $asset['browser_download_url']; }
         }
-        $list_classes = 'pa-speaker-card-list ' . ($context === 'agenda' ? 'pa-speaker-card-list-agenda' : '');
-        if ($categorized_cards) { $list_classes .= ' pa-speaker-card-list-has-categories'; }
-        if ($categorized_cards && $default_cards) { $list_classes .= ' pa-speaker-card-list--categorized-split'; }
-        ob_start();
-        echo '<div class="' . esc_attr(trim($list_classes)) . '">';
-        echo implode('', array_merge($categorized_cards, $default_cards));
-        echo '</div>';
-        return ob_get_clean();
+        return '';
     }
+
 }
 
 new Program_Agenda_Plugin();
-register_activation_hook(__FILE__, function(){ Program_Agenda_Plugin::register_post_types(); flush_rewrite_rules(); });
-register_deactivation_hook(__FILE__, function(){ flush_rewrite_rules(); });
