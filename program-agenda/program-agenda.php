@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.19.008
+ * Version: 1.23.006
  * Update URI: https://github.com/okohring/stagecard
  * Author: Olivia Kohring
  * Text Domain: program-agenda
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.19.008';
+    const VERSION = '1.23.006';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -921,6 +921,7 @@ final class Program_Agenda_Plugin {
         wp_nonce_field('pa_save_sponsor');
         echo '<input type="hidden" name="action" value="pa_save_sponsor"><input type="hidden" name="id" value="' . esc_attr($id) . '"><input type="hidden" name="pa_post_status" value="publish" class="pa-post-status">';
         echo '<label class="pa-field">Company Name <span>*</span><input required type="text" name="sponsor_company" value="' . esc_attr($post ? $post->post_title : '') . '"></label>';
+        echo '<label class="pa-field pa-sponsor-slug-field"><span class="pa-field-heading">Page URL Slug</span><input type="text" name="sponsor_slug" value="' . esc_attr($post ? $post->post_name : '') . '" placeholder="auto-generate-from-company-name"><small>Used in the public sponsor page URL. Leave blank to generate from the company name.</small></label>';
         $logo_id = $id ? absint(get_post_meta($id, '_pa_sponsor_logo_id', true)) : 0;
         $website = $id ? get_post_meta($id, '_pa_sponsor_website', true) : '';
         echo '<div class="pa-sponsor-logo-website-row"><div class="pa-sponsor-logo-cell">';
@@ -1608,6 +1609,7 @@ echo '</label>';
         echo '<div class="pa-event-section pa-event-section-1">';
 
         echo '<label class="pa-field pa-event-title-field pa-event-span-full"><span class="pa-field-heading">Event Title <span>*</span></span><input required type="text" name="event_title" value="' . esc_attr($post ? $post->post_title : '') . '"></label>';
+        echo '<label class="pa-field pa-event-slug-field pa-event-span-full"><span class="pa-field-heading">Page URL Slug</span><input type="text" name="event_slug" value="' . esc_attr($post ? $post->post_name : '') . '" placeholder="auto-generate-from-title"><small>Used in the public event page URL. Leave blank to generate from the title.</small></label>';
 
         echo '<label class="pa-field pa-event-half"><span class="pa-field-heading">Program</span><select name="program_id" class="pa-program-category-source pa-program-date-source"><option value="">No program selected</option>'; foreach ($programs as $pr) { echo '<option value="' . esc_attr($pr->ID) . '" ' . selected($program_id, $pr->ID, false) . '>' . esc_html($pr->post_title) . '</option>'; } echo '</select></label>';
 
@@ -1684,6 +1686,7 @@ echo '</label>';
         echo '<div class="pa-inline-fields pa-three-fields"><label class="pa-field">First Name <span>*</span><input required type="text" name="first_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_first_name', true) : '') . '"></label>';
         echo '<label class="pa-field">Last Name <span>*</span><input required type="text" name="last_name" value="' . esc_attr($id ? get_post_meta($id, '_pa_last_name', true) : '') . '"></label>';
         echo '<label class="pa-field">Credentials<input type="text" name="credentials" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_credentials', true) : '') . '"></label></div>';
+        echo '<label class="pa-field pa-speaker-slug-field"><span class="pa-field-heading">Page URL Slug</span><input type="text" name="speaker_slug" value="' . esc_attr($post ? $post->post_name : '') . '" placeholder="auto-generate-from-name"><small>Used in the public speaker page URL. Leave blank to generate from the speaker name.</small></label>';
         echo '<label class="pa-field">Company <span>*</span><input required type="text" name="company" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_company', true) : '') . '"></label>';
         echo '<label class="pa-field">Role Title<input type="text" name="role_title" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_role_title', true) : '') . '"></label>';
         echo '<div class="pa-inline-fields pa-two-fields"><label class="pa-field">LinkedIn<input type="url" name="linkedin" value="' . esc_attr($id ? get_post_meta($id, '_pa_speaker_linkedin', true) : '') . '"></label>';
@@ -1936,7 +1939,9 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         check_admin_referer('pa_save_event');
         $id = absint($_POST['id'] ?? 0);
         $this->require_edit_pa_post('pa_event', $id);
-        $postarr = ['post_type'=>'pa_event','post_title'=>sanitize_text_field($_POST['event_title'] ?? ''),'post_content'=>wp_kses_post($_POST['event_description'] ?? ''),'post_status'=>$this->requested_post_status()];
+        $event_title = sanitize_text_field($_POST['event_title'] ?? '');
+        $event_slug = sanitize_title($_POST['event_slug'] ?? '');
+        $postarr = ['post_type'=>'pa_event','post_title'=>$event_title,'post_content'=>wp_kses_post($_POST['event_description'] ?? ''),'post_status'=>$this->requested_post_status(),'post_name'=>($event_slug ?: sanitize_title($event_title))];
         if ($id) { $postarr['ID'] = $id; $new_id = wp_update_post($postarr, true); } else { $new_id = wp_insert_post($postarr, true); }
         $new_id = $this->ensure_saved_post_id($new_id);
         foreach (['program_id'=>'_pa_program_id','event_category'=>'_pa_event_category','event_date'=>'_pa_event_date','event_time'=>'_pa_event_time','event_end_time'=>'_pa_event_end_time','event_location'=>'_pa_event_location','event_location_link'=>'_pa_event_location_link','event_image_id'=>'_pa_event_image_id'] as $field=>$meta) {
@@ -1989,7 +1994,8 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         $this->require_edit_pa_post('pa_speaker', $id);
         $first = sanitize_text_field($_POST['first_name'] ?? ''); $last = sanitize_text_field($_POST['last_name'] ?? '');
         $title = trim($first . ' ' . $last);
-        $postarr = ['post_type'=>'pa_speaker','post_title'=>$title,'post_content'=>wp_kses_post($_POST['speaker_bio'] ?? ''),'post_status'=>$this->requested_post_status()];
+        $speaker_slug = sanitize_title($_POST['speaker_slug'] ?? '');
+        $postarr = ['post_type'=>'pa_speaker','post_title'=>$title,'post_content'=>wp_kses_post($_POST['speaker_bio'] ?? ''),'post_status'=>$this->requested_post_status(),'post_name'=>($speaker_slug ?: sanitize_title($title))];
         if ($id) { $postarr['ID'] = $id; $new_id = wp_update_post($postarr, true); } else { $new_id = wp_insert_post($postarr, true); }
         $new_id = $this->ensure_saved_post_id($new_id);
         $fields = ['speaker_image_id'=>'_pa_speaker_image_id','first_name'=>'_pa_first_name','last_name'=>'_pa_last_name','credentials'=>'_pa_speaker_credentials','role_title'=>'_pa_speaker_role_title','company'=>'_pa_speaker_company','linkedin'=>'_pa_speaker_linkedin','website'=>'_pa_speaker_website'];
@@ -2009,7 +2015,8 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         $id = absint($_POST['id'] ?? 0);
         $this->require_edit_pa_post('pa_sponsor', $id);
         $title = sanitize_text_field($_POST['sponsor_company'] ?? '');
-        $postarr = ['post_type'=>'pa_sponsor','post_title'=>$title,'post_content'=>wp_kses_post($_POST['sponsor_bio'] ?? ''),'post_status'=>$this->requested_post_status()];
+        $sponsor_slug = sanitize_title($_POST['sponsor_slug'] ?? '');
+        $postarr = ['post_type'=>'pa_sponsor','post_title'=>$title,'post_content'=>wp_kses_post($_POST['sponsor_bio'] ?? ''),'post_status'=>$this->requested_post_status(),'post_name'=>($sponsor_slug ?: sanitize_title($title))];
         if ($id) { $postarr['ID'] = $id; $new_id = wp_update_post($postarr, true); } else { $new_id = wp_insert_post($postarr, true); }
         $new_id = $this->ensure_saved_post_id($new_id);
         update_post_meta($new_id, '_pa_sponsor_logo_id', absint($_POST['sponsor_logo_id'] ?? 0));
