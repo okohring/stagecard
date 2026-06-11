@@ -2,16 +2,16 @@
 /**
  * Plugin Name: Stagecard
  * Description: A program schedule builder that includes on-brand customization options and automated page creation for events, speakers, and sponsors.
- * Version: 1.23.006
+ * Version: 1.24.002
  * Update URI: https://github.com/okohring/stagecard
- * Author: Olivia Kohring
+ * Author: Liv Kohring
  * Text Domain: program-agenda
  */
 
 if (!defined('ABSPATH')) { exit; }
 
 final class Program_Agenda_Plugin {
-    const VERSION = '1.23.006';
+    const VERSION = '1.24.001';
     const GITHUB_REPO = 'okohring/stagecard';
     const OPT_EVENT = 'pa_event_page_settings';
     const OPT_SPEAKER = 'pa_speaker_page_settings';
@@ -627,30 +627,36 @@ final class Program_Agenda_Plugin {
         return '<td class="' . esc_attr($class) . '" data-pa-sort-value="' . esc_attr($sort_value) . '">' . $html . '</td>';
     }
 
-    private function bulk_actions($post_type) {
-        if (!in_array($post_type, ['pa_event','pa_sponsor'], true)) { return; }
-        $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC']);
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-bulk-form" data-pa-bulk-form="' . esc_attr($post_type) . '">';
-        wp_nonce_field('pa_bulk_items_' . $post_type);
-        echo '<input type="hidden" name="action" value="pa_bulk_items"><input type="hidden" name="post_type" value="' . esc_attr($post_type) . '">';
-        echo '<div class="pa-bulk-toolbar"><label><span>Action</span><select name="bulk_action" class="pa-bulk-action-select"><option value="">No status/delete action</option><option value="draft">Move to Draft</option><option value="delete">Delete</option></select></label>';
-        echo '<label class="pa-bulk-program-field"><span>Assign program</span><select name="bulk_program_id" class="pa-bulk-program-select"><option value="">Assign program</option>';
-        foreach ($programs as $program) {
-            $levels = get_post_meta($program->ID, '_pa_sponsor_levels', true);
-            if (!is_array($levels)) { $levels = []; }
-            $levels = array_values(array_filter(array_unique(array_map('sanitize_text_field', $levels))));
-            echo '<option value="' . esc_attr($program->ID) . '" data-sponsor-levels="' . esc_attr(wp_json_encode($levels)) . '">' . esc_html($program->post_title) . '</option>';
-        }
-        echo '</select></label>';
-        if ($post_type === 'pa_sponsor') {
-            echo '<label class="pa-bulk-level-field" hidden><span>Assign sponsor level</span><select name="bulk_sponsor_level" class="pa-bulk-level-select"><option value="">Assign sponsor level</option></select></label>';
-        }
-        echo '<button type="submit" class="button button-primary pa-bulk-apply">Apply to selected</button><button type="button" class="button pa-bulk-select-visible">Select all visible</button><button type="button" class="button-link pa-bulk-clear">Clear selection</button><span class="pa-bulk-count">0 selected</span></div>';
+private function bulk_actions($post_type) {
+    if (!in_array($post_type, ['pa_event','pa_speaker','pa_sponsor'], true)) { return; }
+
+    $programs = get_posts(['post_type'=>'pa_program','post_status'=>['publish','draft'],'numberposts'=>-1,'orderby'=>'title','order'=>'ASC']);
+    $program_label = $post_type === 'pa_speaker' ? 'Assign program style' : 'Assign program';
+
+    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pa-bulk-form" data-pa-bulk-form="' . esc_attr($post_type) . '">';
+    wp_nonce_field('pa_bulk_items_' . $post_type);
+    echo '<input type="hidden" name="action" value="pa_bulk_items"><input type="hidden" name="post_type" value="' . esc_attr($post_type) . '">';
+    echo '<div class="pa-bulk-toolbar"><label><span>Action</span><select name="bulk_action" class="pa-bulk-action-select"><option value="">No status/delete action</option><option value="draft">Move to Draft</option><option value="delete">Delete</option></select></label>';
+
+    echo '<label class="pa-bulk-program-field"><span>' . esc_html($program_label) . '</span><select name="bulk_program_id" class="pa-bulk-program-select"><option value="">' . esc_html($program_label) . '</option>';
+    foreach ($programs as $program) {
+        $levels = get_post_meta($program->ID, '_pa_sponsor_levels', true);
+        if (!is_array($levels)) { $levels = []; }
+        $levels = array_values(array_filter(array_unique(array_map('sanitize_text_field', $levels))));
+        echo '<option value="' . esc_attr($program->ID) . '" data-sponsor-levels="' . esc_attr(wp_json_encode($levels)) . '">' . esc_html($program->post_title) . '</option>';
+    }
+    echo '</select></label>';
+
+    if ($post_type === 'pa_sponsor') {
+        echo '<label class="pa-bulk-level-field" hidden><span>Assign sponsor level</span><select name="bulk_sponsor_level" class="pa-bulk-level-select"><option value="">Assign sponsor level</option></select></label>';
     }
 
-    private function close_bulk_actions($post_type) {
-        if (in_array($post_type, ['pa_event','pa_sponsor'], true)) { echo '</form>'; }
-    }
+    echo '<button type="submit" class="button button-primary pa-bulk-apply">Apply to selected</button><button type="button" class="button pa-bulk-select-visible">Select all visible</button><button type="button" class="button-link pa-bulk-clear">Clear selection</button><span class="pa-bulk-count">0 selected</span></div>';
+}
+
+private function close_bulk_actions($post_type) {
+    if (in_array($post_type, ['pa_event','pa_speaker','pa_sponsor'], true)) { echo '</form>'; }
+}
 
     private function sponsor_program_ids($sponsor_id) {
         $ids = get_post_meta($sponsor_id, '_pa_sponsor_program_ids', true);
@@ -850,29 +856,62 @@ final class Program_Agenda_Plugin {
         echo '</div>';
     }
 
-    public function page_speakers() {
-        $this->nav('speakers');
-        $this->list_search('Search speakers', 'Search speakers by name, company, role, or credentials');
-        echo '<a class="pa-add-new" href="' . esc_url(admin_url('admin.php?page=program-edit-speaker')) . '">Add new</a>';
-        $this->status_tabs(admin_url('admin.php?page=program-speakers'), 'pa_speaker');
-        $items = $this->query_items('pa_speaker');
-        echo '<table class="pa-table pa-sortable-table"><thead><tr>' . $this->sortable_th('Name') . $this->sortable_th('Company') . $this->sortable_th('Program style') . $this->sortable_th('Page') . $this->sortable_th('Author') . $this->sortable_th('Date Created', 'date') . '<th></th></tr></thead><tbody>';
-        foreach ($items as $p) {
-            $company = get_post_meta($p->ID, '_pa_speaker_company', true);
-            $author = get_the_author_meta('display_name', $p->post_author);
-            $role = get_post_meta($p->ID, '_pa_speaker_role_title', true);
-            $credentials = get_post_meta($p->ID, '_pa_speaker_credentials', true);
-            $style_program_id = $this->speaker_primary_program_id($p->ID);
-            $style_program_title = $style_program_id ? get_the_title($style_program_id) : '';
-            $search_terms = $this->normalize_search_terms([$p->post_title, $company, $role, $credentials, $author, get_the_date('', $p), $style_program_title]);
-            echo '<tr class="pa-searchable-row" data-pa-search="' . esc_attr($search_terms) . '"><td><a href="' . esc_url(admin_url('admin.php?page=program-edit-speaker&id=' . $p->ID)) . '">' . esc_html($p->post_title) . '</a></td><td>' . esc_html($company) . '</td><td>' . ($style_program_title ? esc_html($style_program_title) : '&mdash;') . '</td><td><a href="' . esc_url(get_permalink($p)) . '" target="_blank" rel="noopener">View page</a></td><td>' . esc_html($author) . '</td><td>' . esc_html(get_the_date('', $p)) . '</td><td>' . $this->row_actions($p) . '</td></tr>';
-        }
-        if ($items) { echo '<tr class="pa-list-search-empty" hidden><td colspan="7">No matching speakers found.</td></tr>'; }
-        if (!$items) { echo '<tr><td colspan="7">No speakers found.</td></tr>'; }
-        echo '</tbody></table>';
-        echo '</div>';
+public function page_speakers() {
+    $this->nav('speakers');
+    $this->list_search('Search speakers', 'Search speakers by name, company, role, credentials, or program style');
+    echo '<a class="pa-add-new" href="' . esc_url(admin_url('admin.php?page=program-edit-speaker')) . '">Add new</a>';
+    $this->status_tabs(admin_url('admin.php?page=program-speakers'), 'pa_speaker');
+    $this->bulk_actions('pa_speaker');
+
+    $items = $this->query_items('pa_speaker');
+
+    echo '<table class="pa-table pa-sortable-table"><thead><tr>';
+    echo '<th class="pa-select-col"><label class="screen-reader-text" for="pa-select-all-speakers">Select all speakers</label><input type="checkbox" id="pa-select-all-speakers" class="pa-bulk-check-all"></th>';
+    echo $this->sortable_th('Name');
+    echo $this->sortable_th('Company');
+    echo $this->sortable_th('Program style');
+    echo $this->sortable_th('Page');
+    echo $this->sortable_th('Author');
+    echo $this->sortable_th('Date Created', 'date');
+    echo '<th></th></tr></thead><tbody>';
+
+    foreach ($items as $p) {
+        $company = get_post_meta($p->ID, '_pa_speaker_company', true);
+        $author = get_the_author_meta('display_name', $p->post_author);
+        $role = get_post_meta($p->ID, '_pa_speaker_role_title', true);
+        $credentials = get_post_meta($p->ID, '_pa_speaker_credentials', true);
+        $style_program_id = $this->speaker_primary_program_id($p->ID);
+        $style_program_title = $style_program_id ? get_the_title($style_program_id) : '';
+
+        $search_terms = $this->normalize_search_terms([
+            $p->post_title,
+            $company,
+            $role,
+            $credentials,
+            $style_program_title,
+            $author,
+            get_the_date('', $p),
+        ]);
+
+        echo '<tr class="pa-searchable-row" data-pa-search="' . esc_attr($search_terms) . '">';
+        echo '<td class="pa-select-col"><input type="checkbox" class="pa-bulk-item-check" name="item_ids[]" value="' . esc_attr($p->ID) . '"></td>';
+        echo $this->sort_td('<a href="' . esc_url(admin_url('admin.php?page=program-edit-speaker&id=' . $p->ID)) . '">' . esc_html($p->post_title) . '</a>', $p->post_title);
+        echo $this->sort_td(esc_html($company), $company);
+        echo $this->sort_td($style_program_title ? esc_html($style_program_title) : '&mdash;', $style_program_title);
+        echo $this->sort_td('<a href="' . esc_url(get_permalink($p)) . '" target="_blank" rel="noopener">View page</a>', 'view page');
+        echo $this->sort_td(esc_html($author), $author);
+        echo $this->sort_td(esc_html(get_the_date('', $p)), get_the_date('Y-m-d H:i:s', $p), 'date');
+        echo '<td>' . $this->row_actions($p) . '</td>';
+        echo '</tr>';
     }
 
+    if ($items) { echo '<tr class="pa-list-search-empty" hidden><td colspan="8">No matching speakers found.</td></tr>'; }
+    if (!$items) { echo '<tr><td colspan="8">No speakers found.</td></tr>'; }
+
+    echo '</tbody></table>';
+    $this->close_bulk_actions('pa_speaker');
+    echo '</div>';
+}
     public function page_sponsors() {
         $this->nav('sponsors');
         $this->list_search('Search sponsors', 'Search sponsors by company, program, level, or bio');
@@ -2522,86 +2561,119 @@ update_post_meta($new_id, '_pa_primary_sponsor_level', $primary_sponsor_level);
         wp_safe_redirect(admin_url('admin.php?page=' . $page . '&id=' . $new_id . '&duplicated=1')); exit;
     }
 
-    public function bulk_items() {
-        $post_type = sanitize_key($_POST['post_type'] ?? '');
-        if (!in_array($post_type, ['pa_event','pa_sponsor'], true)) {
-            wp_die(esc_html__('Unsupported bulk action.', 'program-agenda'));
-        }
-        check_admin_referer('pa_bulk_items_' . $post_type);
-        $ids = array_values(array_filter(array_map('absint', (array)($_POST['item_ids'] ?? []))));
-        $bulk_action = sanitize_key($_POST['bulk_action'] ?? '');
-        $program_id = absint($_POST['bulk_program_id'] ?? 0);
-        $level = sanitize_text_field($_POST['bulk_sponsor_level'] ?? '');
-        $redirect_page = $post_type === 'pa_event' ? 'program-events' : 'program-sponsors';
-        $redirect = admin_url('admin.php?page=' . $redirect_page);
+public function bulk_items() {
+    $post_type = sanitize_key($_POST['post_type'] ?? '');
+    if (!in_array($post_type, ['pa_event','pa_speaker','pa_sponsor'], true)) {
+        wp_die(esc_html__('Unsupported bulk action.', 'program-agenda'));
+    }
 
-        if (!$ids || ($bulk_action && !in_array($bulk_action, ['draft','delete'], true))) {
-            wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
-        }
-        if (!$bulk_action && !$program_id) {
-            wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
-        }
-        if ($level && (!$program_id || $post_type !== 'pa_sponsor')) {
-            wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
-        }
-        if ($program_id && get_post_type($program_id) !== 'pa_program') {
-            wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
-        }
+    check_admin_referer('pa_bulk_items_' . $post_type);
 
-        if ($bulk_action === 'delete') {
-            foreach ($ids as $id) {
-                $post = get_post($id);
-                if ($post && $post->post_type === $post_type && current_user_can('delete_post', $id)) {
-                    wp_delete_post($id, true);
-                }
-            }
-            wp_safe_redirect(add_query_arg('bulk_deleted', count($ids), $redirect)); exit;
-        }
+    $ids = array_values(array_filter(array_map('absint', (array)($_POST['item_ids'] ?? []))));
+    $bulk_action = sanitize_key($_POST['bulk_action'] ?? '');
+    $program_id = absint($_POST['bulk_program_id'] ?? 0);
+    $level = sanitize_text_field($_POST['bulk_sponsor_level'] ?? '');
 
-        $updated = 0;
+    if ($post_type === 'pa_event') {
+        $redirect_page = 'program-events';
+    } elseif ($post_type === 'pa_speaker') {
+        $redirect_page = 'program-speakers';
+    } else {
+        $redirect_page = 'program-sponsors';
+    }
+
+    $redirect = admin_url('admin.php?page=' . $redirect_page);
+
+    if (!$ids || ($bulk_action && !in_array($bulk_action, ['draft','delete'], true))) {
+        wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
+    }
+
+    if (!$bulk_action && !$program_id) {
+        wp_safe_redirect(add_query_arg('bulk_error', '1', $redirect)); exit;
+    }
+
+    if ($level && (!$program_id || $post_type !== 'pa_sponsor')) {
+        wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
+    }
+
+    if ($program_id && get_post_type($program_id) !== 'pa_program') {
+        wp_safe_redirect(add_query_arg('bulk_error', 'program', $redirect)); exit;
+    }
+
+    if ($bulk_action === 'delete') {
         foreach ($ids as $id) {
             $post = get_post($id);
-            if (!$post || $post->post_type !== $post_type || !current_user_can('edit_post', $id)) { continue; }
-
-            if ($bulk_action === 'draft') {
-                $result = wp_update_post(['ID' => $id, 'post_status' => 'draft'], true);
-                if (is_wp_error($result)) { continue; }
+            if ($post && $post->post_type === $post_type && current_user_can('delete_post', $id)) {
+                wp_delete_post($id, true);
             }
-
-            if ($program_id) {
-                if ($post_type === 'pa_event') {
-                    update_post_meta($id, '_pa_program_id', $program_id);
-                } else {
-                    $program_ids = $this->sponsor_program_ids($id);
-                    if (!in_array($program_id, $program_ids, true)) { $program_ids[] = $program_id; }
-                    update_post_meta($id, '_pa_sponsor_program_ids', array_values(array_unique(array_map('absint', $program_ids))));
-                    if (!absint(get_post_meta($id, '_pa_sponsor_program_id', true))) { update_post_meta($id, '_pa_sponsor_program_id', $program_id); }
-                    if ($level !== '') {
-                        $program_levels = get_post_meta($id, '_pa_sponsor_program_levels', true);
-                        if (!is_array($program_levels)) { $program_levels = []; }
-                        $program_key = (string) $program_id;
-                        $current = isset($program_levels[$program_key]) && is_array($program_levels[$program_key]) ? $program_levels[$program_key] : [];
-                        if (!$current && isset($program_levels[$program_id]) && is_array($program_levels[$program_id])) { $current = $program_levels[$program_id]; }
-                        $current[] = $level;
-                        $program_levels[$program_key] = array_values(array_filter(array_unique(array_map('sanitize_text_field', $current))));
-                        if (isset($program_levels[$program_id]) && $program_id !== $program_key) { unset($program_levels[$program_id]); }
-                        update_post_meta($id, '_pa_sponsor_program_levels', $program_levels);
-
-                        $legacy_levels = get_post_meta($id, '_pa_sponsor_levels', true);
-                        if (!is_array($legacy_levels)) { $legacy_levels = []; }
-                        $legacy_levels[] = $level;
-                        update_post_meta($id, '_pa_sponsor_levels', array_values(array_filter(array_unique(array_map('sanitize_text_field', $legacy_levels)))));
-                    }
-                }
-            }
-            $updated++;
         }
+        wp_safe_redirect(add_query_arg('bulk_deleted', count($ids), $redirect)); exit;
+    }
+
+    $updated = 0;
+
+    foreach ($ids as $id) {
+        $post = get_post($id);
+        if (!$post || $post->post_type !== $post_type || !current_user_can('edit_post', $id)) { continue; }
 
         if ($bulk_action === 'draft') {
-            wp_safe_redirect(add_query_arg('bulk_drafted', $updated, $redirect)); exit;
+            $result = wp_update_post(['ID' => $id, 'post_status' => 'draft'], true);
+            if (is_wp_error($result)) { continue; }
         }
-        wp_safe_redirect(add_query_arg('bulk_updated', $updated, $redirect)); exit;
+
+        if ($program_id) {
+            if ($post_type === 'pa_event') {
+                update_post_meta($id, '_pa_program_id', $program_id);
+            } elseif ($post_type === 'pa_speaker') {
+                update_post_meta($id, '_pa_speaker_style_program_id', $program_id);
+            } else {
+                $program_ids = $this->sponsor_program_ids($id);
+                if (!in_array($program_id, $program_ids, true)) { $program_ids[] = $program_id; }
+
+                update_post_meta($id, '_pa_sponsor_program_ids', array_values(array_unique(array_map('absint', $program_ids))));
+
+                if (!absint(get_post_meta($id, '_pa_sponsor_program_id', true))) {
+                    update_post_meta($id, '_pa_sponsor_program_id', $program_id);
+                }
+
+                if ($level !== '') {
+                    $program_levels = get_post_meta($id, '_pa_sponsor_program_levels', true);
+                    if (!is_array($program_levels)) { $program_levels = []; }
+
+                    $program_key = (string) $program_id;
+                    $current = isset($program_levels[$program_key]) && is_array($program_levels[$program_key]) ? $program_levels[$program_key] : [];
+
+                    if (!$current && isset($program_levels[$program_id]) && is_array($program_levels[$program_id])) {
+                        $current = $program_levels[$program_id];
+                    }
+
+                    $current[] = $level;
+                    $program_levels[$program_key] = array_values(array_filter(array_unique(array_map('sanitize_text_field', $current))));
+
+                    if (isset($program_levels[$program_id]) && $program_id !== $program_key) {
+                        unset($program_levels[$program_id]);
+                    }
+
+                    update_post_meta($id, '_pa_sponsor_program_levels', $program_levels);
+
+                    $legacy_levels = get_post_meta($id, '_pa_sponsor_levels', true);
+                    if (!is_array($legacy_levels)) { $legacy_levels = []; }
+                    $legacy_levels[] = $level;
+
+                    update_post_meta($id, '_pa_sponsor_levels', array_values(array_filter(array_unique(array_map('sanitize_text_field', $legacy_levels)))));
+                }
+            }
+        }
+
+        $updated++;
     }
+
+    if ($bulk_action === 'draft') {
+        wp_safe_redirect(add_query_arg('bulk_drafted', $updated, $redirect)); exit;
+    }
+
+    wp_safe_redirect(add_query_arg('bulk_updated', $updated, $redirect)); exit;
+}
 
     public function delete_item() {
         $id = absint($_GET['id'] ?? 0);
