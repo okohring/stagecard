@@ -29,12 +29,5 @@ program-agenda/
 
 Do not use GitHub's automatic "Source code" ZIP as the WordPress plugin ZIP. Use the packaged plugin ZIP that contains the correct `program-agenda` folder.
 
-## Release checklist
-
-Before giving a version to a client:
-
-1. Test the ZIP on a personal/staging WordPress site.
-2. Confirm the version number is correct in the plugin header and class constant.
-3. Upload the ZIP as a GitHub Release asset, or use the GitHub Actions packaging workflow once source files are in the repo.
-4. Confirm WordPress detects the update on the test site.
-5. Click through Programs, Events, Speakers, Sponsors, Mass Import, and public shortcodes.
+[Try Stagecard in WordPress Playground]
+(https://playground.wordpress.net/?blueprint-url=https%3A%2F%2Fraw.githubusercontent.com%2Fokohring%2Fstagecard%2Frefs%2Fheads%2Fmain%2Fblueprint.json)
